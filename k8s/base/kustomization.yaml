@@ -1,0 +1,14 @@
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: bookstore
+
+resources:
+  - deployment-backend.yaml
+  - deployment-frontend.yaml
+  - service-backend.yaml
+  - service-frontend.yaml
+  - ingress.yaml
+  - pvc-postgres.yaml
+  - networkpolicy-db.yaml

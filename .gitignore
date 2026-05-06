@@ -1,0 +1,26 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# Docker / K8s
+.dockerignore
+secrets/
+*.key
+*.pem
+k8s/overlays/minikube/*.generated.yaml
+
+# Logs / Env
+*.log
+.env
+.env.local
