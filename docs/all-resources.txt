@@ -1,0 +1,24 @@
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/bookstore-backend-75f484574c-fptrg    1/1     Running   0          74m
+pod/bookstore-backend-75f484574c-wxnnz    1/1     Running   0          74m
+pod/bookstore-frontend-787596dd5c-fgppw   1/1     Running   0          5m37s
+
+NAME                         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+service/bookstore-backend    ClusterIP   10.96.94.159    <none>        80/TCP         125m
+service/bookstore-frontend   NodePort    10.96.219.227   <none>        80:30080/TCP   125m
+
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/bookstore-backend    2/2     2            2           125m
+deployment.apps/bookstore-frontend   1/1     1            1           31m
+
+NAME                                            DESIRED   CURRENT   READY   AGE
+replicaset.apps/bookstore-backend-5684cc756     0         0         0       125m
+replicaset.apps/bookstore-backend-667d86bff8    0         0         0       106m
+replicaset.apps/bookstore-backend-75f484574c    2         2         2       74m
+replicaset.apps/bookstore-backend-7fbfcc978c    0         0         0       97m
+replicaset.apps/bookstore-backend-c4f6546c      0         0         0       118m
+replicaset.apps/bookstore-backend-dd858dd7      0         0         0       101m
+replicaset.apps/bookstore-frontend-6586d46b4b   0         0         0       31m
+replicaset.apps/bookstore-frontend-66d89b6c6    0         0         0       11m
+replicaset.apps/bookstore-frontend-787596dd5c   1         1         1       5m37s
+replicaset.apps/bookstore-frontend-b7b78df54    0         0         0       14m

@@ -1,0 +1,4 @@
+NAME                                  READY   STATUS    RESTARTS   AGE    IP            NODE       NOMINATED NODE   READINESS GATES
+bookstore-backend-75f484574c-fptrg    1/1     Running   0          75m    10.244.0.23   minikube   <none>           <none>
+bookstore-backend-75f484574c-wxnnz    1/1     Running   0          74m    10.244.0.27   minikube   <none>           <none>
+bookstore-frontend-787596dd5c-fgppw   1/1     Running   0          6m5s   10.244.0.38   minikube   <none>           <none>

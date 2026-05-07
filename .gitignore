@@ -24,3 +24,7 @@ k8s/overlays/minikube/*.generated.yaml
 *.log
 .env
 .env.local
+# Minikube binaries - install via package manager, don't commit
+minikube*
+!minikube.yaml
+!minikube/

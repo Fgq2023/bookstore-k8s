@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookstore-frontend
+  labels:
+    app: bookstore-frontend
+    app.kubernetes.io/part-of: bookstore
+    app.kubernetes.io/component: ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bookstore-frontend
+  template:
+    metadata:
+      labels:
+        app: bookstore-frontend
+        app.kubernetes.io/part-of: bookstore
+    spec:
+      # ✅ Pod 级别 securityContext
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      containers:
+      - name: frontend
+        image: bookstore-frontend:dev
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "25m"
+            memory: "32Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
+        # ✅ Container 级别 securityContext
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsUser: 101

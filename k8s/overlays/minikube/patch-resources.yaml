@@ -1,0 +1,35 @@
+# 降低资源请求，适配 Minikube 单节点限制
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookstore-backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookstore-frontend
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"

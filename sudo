@@ -1,0 +1,27 @@
+[root@localhost docker]# sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.1panel.live",
+    "https://docker.kejilion.pro",
+    "https://docker.apiba.cn",
+    "https://docker.367231.xyz",
+    "https://dockerproxy.net",
+    "https://hub.1panel.dev",
+    "https://docker.jsdelivr.fyi",
+    "https://docker-0.unsee.tech",
+    "https://dockercf.jsdelivr.fyi",
+    "https://dockertest.jsdelivr.fyi",
+    "https://docker.fxxk.dedyn.io",
+    "https://xdark.top",
+    "https://hub.amingg.com",
+    "https://docker.1panel.top",
+    "https://docker.amingg.com",
+    "https://docker-registry.nmqu.com",
+    "https://docker.1ms.run",
+    "https://docker.wanpeng.top",
+    "https://docker-mirror.aigc2d.com",
+    "https://666860.xyz"
+  ]
+}
+
+EOF

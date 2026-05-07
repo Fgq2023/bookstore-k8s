@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookstore-backend
+  labels:
+    app: bookstore-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: bookstore-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP

@@ -1,0 +1,14 @@
+Health check output:
+{
+    "status": "healthy",
+    "service": "backend",
+    "mode": "proposal"
+}
+{
+    "status": "ready",
+    "service": "backend"
+}
+{
+    "books": [],
+    "message": "Proposal placeholder"
+}

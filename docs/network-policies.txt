@@ -1,0 +1,68 @@
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"bookstore","app.kubernetes.io/version":"1.0.0"},"name":"allow-frontend-from-backend","namespace":"bookstore"},"spec":{"ingress":[{"from":[{"podSelector":{"matchLabels":{"app":"bookstore-backend"}}}],"ports":[{"port":80,"protocol":"TCP"}]}],"podSelector":{"matchLabels":{"app":"bookstore-frontend"}},"policyTypes":["Ingress"]}}
+    creationTimestamp: "2026-05-06T23:34:29Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: bookstore
+      app.kubernetes.io/version: 1.0.0
+    name: allow-frontend-from-backend
+    namespace: bookstore
+    resourceVersion: "10793"
+    uid: 5456e985-560b-4b21-aaea-44637aeeb950
+  spec:
+    ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            app: bookstore-backend
+      ports:
+      - port: 80
+        protocol: TCP
+    podSelector:
+      matchLabels:
+        app: bookstore-frontend
+    policyTypes:
+    - Ingress
+- apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"annotations":{},"labels":{"app":"bookstore-db","app.kubernetes.io/name":"bookstore","app.kubernetes.io/version":"1.0.0"},"name":"postgres-allow-backend-only","namespace":"bookstore"},"spec":{"ingress":[{"from":[{"podSelector":{"matchLabels":{"app":"bookstore-backend","app.kubernetes.io/name":"bookstore","app.kubernetes.io/version":"1.0.0"}}}],"ports":[{"port":5432,"protocol":"TCP"}]}],"podSelector":{"matchLabels":{"app":"bookstore-db","app.kubernetes.io/name":"bookstore","app.kubernetes.io/version":"1.0.0"}},"policyTypes":["Ingress"]}}
+    creationTimestamp: "2026-05-06T21:34:56Z"
+    generation: 1
+    labels:
+      app: bookstore-db
+      app.kubernetes.io/name: bookstore
+      app.kubernetes.io/version: 1.0.0
+    name: postgres-allow-backend-only
+    namespace: bookstore
+    resourceVersion: "2867"
+    uid: 56852f9f-e29a-46aa-aee7-6bdee51c1f50
+  spec:
+    ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            app: bookstore-backend
+            app.kubernetes.io/name: bookstore
+            app.kubernetes.io/version: 1.0.0
+      ports:
+      - port: 5432
+        protocol: TCP
+    podSelector:
+      matchLabels:
+        app: bookstore-db
+        app.kubernetes.io/name: bookstore
+        app.kubernetes.io/version: 1.0.0
+    policyTypes:
+    - Ingress
+kind: List
+metadata:
+  resourceVersion: ""

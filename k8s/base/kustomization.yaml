@@ -1,14 +1,21 @@
-```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: bookstore
 
 resources:
-  - deployment-backend.yaml
-  - deployment-frontend.yaml
-  - service-backend.yaml
-  - service-frontend.yaml
-  - ingress.yaml
+  - namespace.yaml
+  - configmap.yaml
   - pvc-postgres.yaml
   - networkpolicy-db.yaml
+  - service-backend.yaml
+  - service-frontend.yaml
+  - deployment-backend.yaml
+  - deployment-frontend.yaml
+  # - ingress.yaml  # 提案阶段跳过，生产环境取消注释
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: bookstore
+      app.kubernetes.io/version: "1.0.0"
+    includeSelectors: true

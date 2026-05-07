@@ -1,0 +1,22 @@
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsUser: 101
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-05-06T23:28:58Z"
+    lastUpdateTime: "2026-05-06T23:28:58Z"
+    message: Deployment has minimum availability.

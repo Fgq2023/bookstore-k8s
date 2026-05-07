@@ -1,0 +1,2 @@
+Cluster-internal routing test:
+{"status":"healthy","service":"frontend"}

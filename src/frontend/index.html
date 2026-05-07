@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookstore - Placeholder</title>
+  <style>
+    body { font-family: system-ui; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .status { color: #22c55e; font-weight: 600; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>📚 Cloud-Native Bookstore</h1>
+  <div class="card">
+    <h2>✅ Deployment Status</h2>
+    <p class="status">Frontend is running in placeholder mode</p>
+    <p>Kubernetes manifests validated: <code>9 resources</code></p>
+  </div>
+  <div class="card">
+    <h2>🔌 API Connection Test</h2>
+    <button onclick="testAPI()">Test Backend API</button>
+    <pre id="result">Click button to test...</pre>
+  </div>
+  <script>
+    async function testAPI() {
+      const result = document.getElementById('result');
+      result.textContent = 'Connecting...';
+      try {
+        const res = await fetch('/api/books');
+        const data = await res.json();
+        result.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        result.textContent = 'Error: ' + e.message + '\n\nNote: Backend may still be starting up.';
+      }
+    }
+    // Auto-test on load
+    window.onload = testAPI;
+  </script>
+</body>
+</html>
