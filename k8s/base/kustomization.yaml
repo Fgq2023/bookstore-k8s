@@ -6,13 +6,17 @@ namespace: bookstore
 resources:
   - namespace.yaml
   - configmap.yaml
+  - secret-db.yaml   
   - pvc-postgres.yaml
+  - deployment-postgres.yaml  
+  - service-postgres.yaml 
   - networkpolicy-db.yaml
   - service-backend.yaml
   - service-frontend.yaml
   - deployment-backend.yaml
   - deployment-frontend.yaml
-  # - ingress.yaml  # 提案阶段跳过，生产环境取消注释
+  - ingress.yaml
+  - hpa.yaml
 
 labels:
   - pairs:
