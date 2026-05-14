@@ -1,0 +1,71 @@
+# k8s/base/deployment-postgres.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookstore-db
+  labels:
+    app: bookstore-db
+    app.kubernetes.io/name: bookstore
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bookstore-db
+  template:
+    metadata:
+      labels:
+        app: bookstore-db
+        app.kubernetes.io/name: bookstore
+    spec:
+      securityContext:
+        fsGroup: 70
+      initContainers:
+      - name: fix-permissions
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'chown -R 70:70 /var/lib/postgresql/data || true']
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+          name: postgres
+        envFrom:
+        - secretRef:
+            name: db-credentials
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 70
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "bookstore_user"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "bookstore_user"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-pvc

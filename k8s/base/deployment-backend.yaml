@@ -52,10 +52,26 @@ spec:
           limits:
             cpu: "300m"
             memory: "256Mi"
-        # ✅ 提案模式：硬编码环境变量，避免 Secret/ConfigMap key 匹配问题
         env:
-        - name: DATABASE_URL
-          value: "postgresql://user:password@bookstore-db:5432/bookstore"
+        - name: DB_HOST
+          value: "bookstore-db"
+        - name: DB_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
         - name: APP_ENV
           value: "development"
         - name: LOG_LEVEL

@@ -1,0 +1,18 @@
+# k8s/base/service-postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookstore-db
+  labels:
+    app: bookstore-db
+    app.kubernetes.io/name: bookstore
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    app: bookstore-db
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP

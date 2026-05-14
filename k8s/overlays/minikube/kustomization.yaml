@@ -9,6 +9,13 @@ resources:
 patches:
   - path: patch-resources.yaml
   - path: patch-service-type.yaml
+  - target:
+      kind: Ingress
+      name: bookstore-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: bookstore.local
 
 images:
   - name: bookstore-backend

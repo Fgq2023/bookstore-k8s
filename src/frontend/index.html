@@ -3,40 +3,296 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bookstore - Placeholder</title>
+  <title>Cloud-Native Bookstore</title>
   <style>
-    body { font-family: system-ui; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-    .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-    .status { color: #22c55e; font-weight: 600; }
-    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+    :root { --primary: #2563eb; --primary-dark: #1d4ed8; --danger: #dc2626; --success: #16a34a; --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --muted: #64748b; --border: #e2e8f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 1rem; position: sticky; top: 0; z-index: 10; }
+    nav { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+    .logo { font-weight: 700; font-size: 1.25rem; color: var(--primary); letter-spacing: -0.5px; }
+    .nav-links { display: flex; gap: .5rem; }
+    .nav-btn { background: transparent; border: none; padding: .5rem .75rem; border-radius: 8px; cursor: pointer; font-size: .95rem; color: var(--muted); display: inline-flex; align-items: center; gap: .35rem; }
+    .nav-btn:hover { background: #f1f5f9; color: var(--text); }
+    .nav-btn.active { background: #eff6ff; color: var(--primary); font-weight: 600; }
+    .badge { background: var(--danger); color: #fff; font-size: .7rem; padding: 0 .4rem; border-radius: 999px; min-width: 18px; text-align: center; }
+    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
+    .toolbar { display: flex; gap: .75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .toolbar input { flex: 1; min-width: 220px; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; outline: none; }
+    .toolbar input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .btn { border: none; padding: .6rem 1rem; border-radius: 10px; cursor: pointer; font-size: .95rem; font-weight: 600; transition: transform .05s; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: #f8fafc; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .book-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; gap: .5rem; transition: box-shadow .2s; }
+    .book-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+    .book-title { font-weight: 700; font-size: 1.05rem; line-height: 1.25; }
+    .book-meta { color: var(--muted); font-size: .88rem; }
+    .book-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: .5rem; }
+    .price { font-weight: 800; font-size: 1.15rem; color: var(--primary); }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    th, td { padding: .75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #f8fafc; font-weight: 600; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+    tr:last-child td { border-bottom: none; }
+    .qty { width: 64px; padding: .35rem .5rem; border: 1px solid var(--border); border-radius: 8px; text-align: center; }
+    .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+    .empty h3 { color: var(--text); margin: .5rem 0; }
+    .summary { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 1rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+    .total { font-size: 1.25rem; font-weight: 800; }
+    .toast { position: fixed; bottom: 1.25rem; right: 1.25rem; background: var(--text); color: #fff; padding: .75rem 1rem; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); transform: translateY(120%); transition: transform .3s ease; z-index: 20; }
+    .toast.show { transform: translateY(0); }
+    .order-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: .75rem; cursor: pointer; }
+    .order-card:hover { border-color: #cbd5e1; }
+    .order-header { display: flex; justify-content: space-between; align-items: center; }
+    .status { font-size: .8rem; font-weight: 700; padding: .25rem .5rem; border-radius: 999px; text-transform: uppercase; }
+    .status-confirmed { background: #dcfce7; color: #166534; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <h1>📚 Cloud-Native Bookstore</h1>
-  <div class="card">
-    <h2>✅ Deployment Status</h2>
-    <p class="status">Frontend is running in placeholder mode</p>
-    <p>Kubernetes manifests validated: <code>9 resources</code></p>
-  </div>
-  <div class="card">
-    <h2>🔌 API Connection Test</h2>
-    <button onclick="testAPI()">Test Backend API</button>
-    <pre id="result">Click button to test...</pre>
-  </div>
+  <header>
+    <nav>
+      <div class="logo">📚 Cloud Bookstore</div>
+      <div class="nav-links">
+        <button class="nav-btn active" data-view="books" onclick="switchView('books')">📖 Books</button>
+        <button class="nav-btn" data-view="cart" onclick="switchView('cart')">🛒 Cart <span id="cartBadge" class="badge hidden">0</span></button>
+        <button class="nav-btn" data-view="orders" onclick="switchView('orders')">📦 Orders</button>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Books View -->
+    <section id="view-books">
+      <div class="toolbar">
+        <input type="text" id="searchInput" placeholder="Search by title or author..." oninput="searchBooks()">
+        <button class="btn btn-primary" onclick="searchBooks()">Search</button>
+        <button class="btn btn-outline" onclick="loadBooks()">Reset</button>
+      </div>
+      <div id="booksGrid" class="grid"></div>
+    </section>
+
+    <!-- Cart View -->
+    <section id="view-cart" class="hidden">
+      <h2>Shopping Cart</h2>
+      <div id="cartContent"></div>
+    </section>
+
+    <!-- Orders View -->
+    <section id="view-orders" class="hidden">
+      <h2>My Orders</h2>
+      <div id="ordersList"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
   <script>
-    async function testAPI() {
-      const result = document.getElementById('result');
-      result.textContent = 'Connecting...';
-      try {
-        const res = await fetch('/api/books');
-        const data = await res.json();
-        result.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        result.textContent = 'Error: ' + e.message + '\n\nNote: Backend may still be starting up.';
-      }
+    const API = '/api';
+    const sessionId = localStorage.getItem('bookstore_session') || crypto.randomUUID();
+    localStorage.setItem('bookstore_session', sessionId);
+    let currentBooks = [];
+    let currentView = 'books';
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
     }
-    // Auto-test on load
-    window.onload = testAPI;
+
+    function switchView(view) {
+      currentView = view;
+      document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+      document.getElementById('view-' + view).classList.remove('hidden');
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+      if (view === 'cart') loadCart();
+      if (view === 'orders') loadOrders();
+    }
+
+    async function api(path, opts = {}) {
+      const url = API + path + (path.includes('?') ? '&' : '?') + 'session_id=' + encodeURIComponent(sessionId);
+      const res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function loadBooks() {
+      try {
+        document.getElementById('searchInput').value = '';
+        const data = await api('/books');
+        currentBooks = data.books || [];
+        renderBooks(currentBooks);
+      } catch (e) { showToast('Error loading books: ' + e.message); }
+    }
+
+    function renderBooks(books) {
+      const grid = document.getElementById('booksGrid');
+      if (!books.length) { grid.innerHTML = '<div class="empty"><h3>No books found</h3></div>'; return; }
+      grid.innerHTML = books.map(b => `
+        <div class="book-card">
+          <div class="book-title">${escapeHtml(b.title)}</div>
+          <div class="book-meta">${escapeHtml(b.author)}<br>ISBN: ${escapeHtml(b.isbn || '-')}</div>
+          <div class="book-footer">
+            <span class="price">$${Number(b.price || 0).toFixed(2)}</span>
+            <button class="btn btn-primary" onclick="addToCart('${b.id}', 1)">Add to Cart</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function searchBooks() {
+      const q = document.getElementById('searchInput').value.trim();
+      if (!q) { loadBooks(); return; }
+      try {
+        const data = await api('/books/search?q=' + encodeURIComponent(q));
+        renderBooks(data.books || []);
+      } catch (e) { showToast('Search error: ' + e.message); }
+    }
+
+    async function addToCart(bookId, qty) {
+      try {
+        await api('/cart', { method: 'POST', body: JSON.stringify({ session_id: sessionId, book_id: bookId, quantity: qty }) });
+        showToast('Added to cart');
+        updateCartBadge();
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    async function loadCart() {
+      try {
+        const data = await api('/cart');
+        renderCart(data);
+        updateCartBadge(data.items ? data.items.length : 0);
+      } catch (e) { showToast('Error loading cart: ' + e.message); }
+    }
+
+    function renderCart(data) {
+      const container = document.getElementById('cartContent');
+      const items = data.items || [];
+      if (!items.length) {
+        container.innerHTML = '<div class="empty"><h3>Your cart is empty</h3><p>Browse books and add some!</p></div>';
+        return;
+      }
+      container.innerHTML = `
+        <table>
+          <thead><tr><th>Book</th><th>Price</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody>
+            ${items.map(it => `
+              <tr>
+                <td><strong>${escapeHtml(it.title)}</strong><br><span class="book-meta">${escapeHtml(it.author)}</span></td>
+                <td>$${Number(it.price).toFixed(2)}</td>
+                <td><input type="number" class="qty" value="${it.quantity}" min="1" onchange="updateQty(${it.id}, this.value)"></td>
+                <td>$${(it.price * it.quantity).toFixed(2)}</td>
+                <td><button class="btn btn-danger" onclick="removeItem(${it.id})">Remove</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="summary">
+          <span class="total">Total: $${Number(data.total || 0).toFixed(2)}</span>
+          <button class="btn btn-primary" onclick="placeOrder()">Place Order</button>
+        </div>
+      `;
+    }
+
+    async function updateQty(itemId, qty) {
+      qty = parseInt(qty) || 1;
+      try {
+        await api('/cart/item/' + itemId, { method: 'PUT', body: JSON.stringify({ session_id: sessionId, quantity: qty }) });
+        loadCart();
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    async function removeItem(itemId) {
+      try {
+        await api('/cart/item/' + itemId + '?session_id=' + sessionId, { method: 'DELETE' });
+        loadCart();
+        showToast('Removed from cart');
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    async function placeOrder() {
+      try {
+        const data = await api('/orders', { method: 'POST', body: JSON.stringify({ session_id: sessionId }) });
+        showToast('Order placed! #' + data.order_id);
+        loadCart();
+        switchView('orders');
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    async function loadOrders() {
+      try {
+        const data = await api('/orders');
+        renderOrders(data.orders || []);
+      } catch (e) { showToast('Error loading orders: ' + e.message); }
+    }
+
+    function renderOrders(orders) {
+      const container = document.getElementById('ordersList');
+      if (!orders.length) {
+        container.innerHTML = '<div class="empty"><h3>No orders yet</h3><p>Place your first order from the cart!</p></div>';
+        return;
+      }
+      container.innerHTML = orders.map(o => `
+        <div class="order-card" onclick="showOrderDetail(${o.id})">
+          <div class="order-header">
+            <div><strong>Order #${o.id}</strong> <span class="status status-${o.status}">${o.status}</span></div>
+            <div class="price">$${Number(o.total_amount || 0).toFixed(2)}</div>
+          </div>
+          <div class="book-meta">${new Date(o.created_at).toLocaleString()}</div>
+        </div>
+      `).join('');
+    }
+
+    async function showOrderDetail(orderId) {
+      try {
+        const o = await api('/orders/' + orderId);
+        const items = (o.items || []).map(it => `<li>${escapeHtml(it.title)} x${it.quantity} — $${(it.price * it.quantity).toFixed(2)}</li>`).join('');
+        const html = `
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-top:.75rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+              <h3 style="margin:0">Order #${o.id}</h3>
+              <span class="status status-${o.status}">${o.status}</span>
+            </div>
+            <div class="book-meta" style="margin-bottom:1rem">${new Date(o.created_at).toLocaleString()}</div>
+            <ul style="padding-left:1.25rem;line-height:1.8">${items}</ul>
+            <div class="summary" style="margin-top:1rem">
+              <span class="total">Total: $${Number(o.total_amount || 0).toFixed(2)}</span>
+              <button class="btn btn-outline" onclick="switchView('orders')">Back</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('ordersList').innerHTML = html;
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    async function updateCartBadge(count) {
+      if (count === undefined) {
+        try {
+          const data = await api('/cart');
+          count = (data.items || []).length;
+        } catch { count = 0; }
+      }
+      const badge = document.getElementById('cartBadge');
+      badge.textContent = count;
+      badge.classList.toggle('hidden', count === 0);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Init
+    loadBooks();
+    updateCartBadge();
   </script>
 </body>
 </html>

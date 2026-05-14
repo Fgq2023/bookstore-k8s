@@ -1,2 +1,2 @@
-# Empty file - using pure Python http.server for proposal mode
-# Production: add fastapi==0.109.0, uvicorn[standard]==0.27.0
+# src/backend/requirements.txt
+psycopg2-binary==2.9.9

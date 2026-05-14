@@ -1,13 +1,15 @@
+# k8s/base/pvc-postgres.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
   labels:
-    app: bookstore-db
+    app.kubernetes.io/name: bookstore
+    app.kubernetes.io/component: database
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi  # Minikube 单节点足够；生产环境建议 10Gi+
+      storage: 1Gi
   storageClassName: standard  # Minikube 默认 StorageClass
