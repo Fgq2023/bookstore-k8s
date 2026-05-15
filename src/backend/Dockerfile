@@ -15,8 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt -i ${PIP_INDEX_URL} --timeout
 # ─── Stage 2: Runtime ───
 FROM python:3.11-slim AS runtime
 
-# Patch base image vulnerabilities (system packages)
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+# Aggressively patch base image system packages to eliminate known CVEs.
+# Force non-interactive mode so held packages are also upgraded.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
+    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /app
 
