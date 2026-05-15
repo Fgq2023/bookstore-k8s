@@ -1,4 +1,4 @@
-.PHONY: help build build-backend build-frontend load load-backend load-frontend deploy deploy-tag test clean scan status
+.PHONY: help build build-backend build-frontend load load-backend load-frontend deploy deploy-monitoring deploy-tag test clean scan status load-test port-forward-prometheus port-forward-grafana
 
 # 可覆盖的变量
 VERSION     ?= dev
@@ -43,7 +43,12 @@ update-tags: ## 自动更新 overlay 中的镜像 tag
 deploy: ## 应用 K8s 清单（Minikube 环境）
 	kubectl apply -k $(OVERLAY_DIR)
 
-deploy-tag: load deploy ## 一键构建→加载→更新tag→部署
+deploy-monitoring: ## 部署 Grafana Dashboard 到 monitoring namespace
+	@echo "📊 Deploying Grafana dashboard..."
+	kubectl apply -k k8s/monitoring/
+	echo "✅ Dashboard deployed. Access Grafana: make port-forward-grafana"
+
+deploy-tag: load deploy deploy-monitoring ## 一键构建→加载→更新tag→部署+监控
 	@echo "🚀 Deployment complete with version $(VERSION)"
 
 # ================= 验证 =================
@@ -73,6 +78,26 @@ status: ## 快速查看所有组件状态
 # ================= 清理 =================
 clean: ## 清理部署资源
 	kubectl delete -k $(OVERLAY_DIR)
+
+# ================= 监控访问 =================
+port-forward-prometheus: ## 端口转发 Prometheus UI (localhost:9090)
+	@echo "📊 Prometheus: http://localhost:9090"
+	kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+
+port-forward-grafana: ## 端口转发 Grafana UI (localhost:3000)
+	@echo "📈 Grafana: http://localhost:3000 (admin / $$(kubectl get secret -n monitoring prometheus-grafana -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null || echo 'see secret'))"
+	kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# ================= 性能测试 =================
+LOADTEST_URL ?= http://$$(minikube ip)
+
+load-test: ## 运行 k6 负载测试（通过 Docker）
+	@echo "⚡ Starting k6 load test against $(LOADTEST_URL)"
+	@docker run --rm -i --network=host \
+		-v "$(PWD)/scripts:/scripts" \
+		grafana/k6:latest run /scripts/loadtest.js \
+		-e BASE_URL=$(LOADTEST_URL) \
+		|| echo "❌ k6 failed. Ensure Docker is running."
 
 # ================= 安全扫描 =================
 scan: ## 容器安全扫描（需安装 Trivy）

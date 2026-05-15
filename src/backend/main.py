@@ -33,11 +33,11 @@ except ImportError:
 
 # ================= Sample Data =================
 FALLBACK_BOOKS = [
-    {"id": "1", "title": "Cloud Native Patterns", "author": "Cornelia Davis", "isbn": "978-1492041153", "price": 45.99},
-    {"id": "2", "title": "Kubernetes in Action", "author": "Marko Luksa", "isbn": "978-1617293726", "price": 49.99},
-    {"id": "3", "title": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "isbn": "978-1449373320", "price": 55.00},
-    {"id": "4", "title": "The Phoenix Project", "author": "Gene Kim", "isbn": "978-1942788294", "price": 24.99},
-    {"id": "5", "title": "Site Reliability Engineering", "author": "Betsy Beyer", "isbn": "978-1491929124", "price": 39.99},
+    {"id": "1", "title": "Cloud Native Patterns", "author": "Cornelia Davis", "isbn": "978-1492041153", "price": 45.99, "stock_quantity": 100},
+    {"id": "2", "title": "Kubernetes in Action", "author": "Marko Luksa", "isbn": "978-1617293726", "price": 49.99, "stock_quantity": 100},
+    {"id": "3", "title": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "isbn": "978-1449373320", "price": 55.00, "stock_quantity": 100},
+    {"id": "4", "title": "The Phoenix Project", "author": "Gene Kim", "isbn": "978-1942788294", "price": 24.99, "stock_quantity": 100},
+    {"id": "5", "title": "Site Reliability Engineering", "author": "Betsy Beyer", "isbn": "978-1491929124", "price": 39.99, "stock_quantity": 100},
 ]
 
 # Fallback memory stores
@@ -48,10 +48,28 @@ FALLBACK_ORDER_SEQ = 0
 # ================= Logging & Metrics =================
 APP_ENV = os.getenv('APP_ENV', 'development')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'info').upper()
+
+# Structured JSON logging for cloud-native environments
+_log_handler = logging.StreamHandler(sys.stdout)
+if APP_ENV == 'production':
+    try:
+        from pythonjsonlogger import jsonlogger
+        _log_handler.setFormatter(jsonlogger.JsonFormatter(
+            '%(timestamp)s %(level)s %(name)s %(message)s %(pathname)s %(lineno)d',
+            rename_fields={'levelname': 'level', 'asctime': 'timestamp'}
+        ))
+    except ImportError:
+        _log_handler.setFormatter(logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(name)s %(message)s'
+        ))
+else:
+    _log_handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s'
+    ))
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    stream=sys.stdout
+    handlers=[_log_handler]
 )
 logger = logging.getLogger('bookstore')
 
@@ -266,7 +284,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                 conn = get_db_connection()
                 if conn:
                     cur = conn.cursor(cursor_factory=RealDictCursor)
-                    cur.execute("SELECT id, title, author, isbn, price, created_at FROM books ORDER BY id")
+                    cur.execute("SELECT id, title, author, isbn, price, stock_quantity, created_at, updated_at FROM books ORDER BY id")
                     books = [dict(row) for row in cur.fetchall()]
                     cur.close(); put_db_connection(conn)
                     self._send_json({"count": len(books), "books": books})
@@ -363,7 +381,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                 conn = get_db_connection()
                 if conn:
                     cur = conn.cursor(cursor_factory=RealDictCursor)
-                    cur.execute("SELECT id, total_amount, status, created_at FROM orders WHERE session_id = %s ORDER BY id DESC", (session_id,))
+                    cur.execute("SELECT id, total_amount, status, created_at, updated_at, status_history FROM orders WHERE session_id = %s ORDER BY id DESC", (session_id,))
                     orders = [dict(r) for r in cur.fetchall()]
                     cur.close(); put_db_connection(conn)
                     self._send_json({"session_id": session_id, "count": len(orders), "orders": orders})
@@ -378,7 +396,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                 conn = get_db_connection()
                 if conn:
                     cur = conn.cursor(cursor_factory=RealDictCursor)
-                    cur.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+                    cur.execute("SELECT id, session_id, total_amount, status, created_at, updated_at, status_history FROM orders WHERE id = %s", (order_id,))
                     order = cur.fetchone()
                     if not order:
                         cur.close(); put_db_connection(conn)
@@ -474,7 +492,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         return 400
                     cart_id = row[0]
                     cur.execute("""
-                        SELECT ci.book_id, ci.quantity, b.price, b.title, b.author
+                        SELECT ci.book_id, ci.quantity, b.price, b.title, b.author, b.stock_quantity
                         FROM cart_items ci
                         JOIN books b ON ci.book_id = b.id
                         WHERE ci.cart_id = %s
@@ -484,19 +502,47 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         cur.close(); put_db_connection(conn)
                         self._send_error("cart is empty", 400)
                         return 400
-                    total = sum(qty * price for _, qty, price, _, _ in items)
+
+                    # Check stock availability
+                    stock_issues = []
+                    for book_id, qty, _, _, _, stock in items:
+                        if stock < qty:
+                            stock_issues.append(f"book {book_id}: requested {qty}, available {stock}")
+                    if stock_issues:
+                        cur.close(); put_db_connection(conn)
+                        self._send_error(f"insufficient stock: {'; '.join(stock_issues)}", 400)
+                        return 400
+
+                    total = sum(qty * price for _, qty, price, _, _, _ in items)
+
+                    # Create order with 'pending' status
                     cur.execute(
-                        "INSERT INTO orders (session_id, total_amount, status) VALUES (%s, %s, %s) RETURNING id",
-                        (session_id, total, 'confirmed')
+                        "INSERT INTO orders (session_id, total_amount, status, status_history) VALUES (%s, %s, %s, %s) RETURNING id",
+                        (session_id, total, 'pending', json.dumps([{"status": "pending", "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}]))
                     )
                     order_id = cur.fetchone()[0]
-                    for book_id, qty, price, title, author in items:
+
+                    # Insert order items and deduct stock
+                    for book_id, qty, price, title, author, _ in items:
                         cur.execute(
                             "INSERT INTO order_items (order_id, book_id, quantity, price, title, author) VALUES (%s, %s, %s, %s, %s, %s)",
                             (order_id, book_id, qty, price, title, author)
                         )
+                        cur.execute(
+                            "UPDATE books SET stock_quantity = stock_quantity - %s WHERE id = %s",
+                            (qty, book_id)
+                        )
+
+                    # Transition to 'confirmed'
+                    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                    cur.execute(
+                        "UPDATE orders SET status = %s, status_history = status_history || %s::jsonb WHERE id = %s",
+                        ('confirmed', json.dumps({"status": "confirmed", "at": now_iso}), order_id)
+                    )
+
                     cur.execute("DELETE FROM cart_items WHERE cart_id = %s", (cart_id,))
                     cur.close(); put_db_connection(conn)
+                    logger.info(f"Order created: id={order_id}, total={total}, items={len(items)}")
                     self._send_json({"status": "created", "order_id": order_id, "total": float(total)}, 201)
                 else:
                     cart = _get_or_create_fallback_cart(session_id)
@@ -514,9 +560,12 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                             "price": price, "title": b["title"] if b else "", "author": b["author"] if b else ""
                         })
                     order_id = _fallback_next_order_id()
+                    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                     order = {
                         "id": order_id, "session_id": session_id, "total_amount": round(total, 2),
-                        "status": "confirmed", "items": order_items, "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                        "status": "confirmed", "items": order_items,
+                        "created_at": now_iso, "updated_at": now_iso,
+                        "status_history": [{"status": "pending", "at": now_iso}, {"status": "confirmed", "at": now_iso}]
                     }
                     if session_id not in FALLBACK_ORDERS:
                         FALLBACK_ORDERS[session_id] = []
