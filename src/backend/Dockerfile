@@ -2,7 +2,8 @@
 # Multi-stage build for smaller image and reduced attack surface
 
 # ─── Stage 1: Builder ───
-FROM python:3.11-slim AS builder
+# Use explicit bookworm tag for latest Debian 12 security patches
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 RUN python -m venv /app/venv
@@ -13,13 +14,11 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 RUN pip install --no-cache-dir -r requirements.txt -i ${PIP_INDEX_URL} --timeout 120
 
 # ─── Stage 2: Runtime ───
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim-bookworm AS runtime
 
-# Aggressively patch base image system packages to eliminate known CVEs.
-# Force non-interactive mode so held packages are also upgraded.
+# Patch available system packages (Hadolint allows upgrade, not dist-upgrade)
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
-    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
