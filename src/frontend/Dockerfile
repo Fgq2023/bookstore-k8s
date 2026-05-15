@@ -1,17 +1,29 @@
 # src/frontend/Dockerfile
+# Multi-stage build: Node build → nginx serve
+
+# ─── Stage 1: Build ───
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# ─── Stage 2: Runtime ───
 FROM nginx:1.25-alpine
 
 # Patch base image vulnerabilities
 RUN apk upgrade --no-cache
 
-# 删除默认配置
+# Remove default config
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-# 复制自定义配置 + 静态文件
+# Copy custom config + built static files
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY index.html /usr/share/nginx/html/index.html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# ✅ 关键修复：预创建并授权所有 nginx 需要写入的路径
+# Pre-create and chown nginx paths for non-root (UID 101)
 RUN mkdir -p /var/cache/nginx /var/log/nginx /var/run \
     && touch /var/run/nginx.pid \
     && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /var/run/nginx.pid \

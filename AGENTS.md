@@ -6,8 +6,8 @@
 
 ## Architecture (3 tiers)
 - **Database**: PostgreSQL 15 (Alpine), deployed via `k8s/base/deployment-postgres.yaml`. Uses PVC `postgres-pvc` and Secret `db-credentials`.
-- **Backend**: Custom Python 3.11 HTTP server (`src/backend/main.py`, *not* FastAPI/Flask). Entrypoint: `python3 -u main.py`. Port `8000`. Depends on `psycopg2-binary`. Falls back to an in-memory book list if PostgreSQL is unreachable. Calls `init_database()` on startup to create schema and seed sample data.
-- **Frontend**: Static HTML (`src/frontend/index.html`) served by nginx 1.25-alpine. Port `80`. Not a real Node/Vite app; `package.json` and `vite.config.js` are placeholders.
+- **Backend**: Flask 3.0 + Gunicorn 22 (`src/backend/main.py`). Entrypoint: `gunicorn -w 1 -b 0.0.0.0:8000 main:app`. Port `8000`. Depends on `psycopg2-binary`, `Flask`, `gunicorn`. Falls back to an in-memory book list if PostgreSQL is unreachable. Calls `init_database()` on startup to create schema and seed sample data.
+- **Frontend**: Vue 3 + Vite + Tailwind CSS SPA (`src/frontend/`). Served by nginx 1.25-alpine. Port `80`. Build pipeline: `npm install` → `vite build` → nginx serves `dist/`. Uses Vue Router (`createWebHistory`) for client-side routing.
 
 ## Developer commands
 - Start Minikube:
@@ -64,13 +64,14 @@
   - `POST /api/orders` — place order from cart
   - `GET /api/orders?session_id=xxx` — list orders
   - `GET /api/orders/<id>` — order details
-- **JSON serialization**: `DecimalEncoder` handles `Decimal` (from PostgreSQL `NUMERIC`) and `datetime` (from `TIMESTAMP`). If you add new column types, extend the encoder.
-- `log_message` is overridden to suppress default HTTP request logs.
+- **JSON serialization**: `DecimalEncoder` handles `Decimal` (from PostgreSQL `NUMERIC`) and `datetime` (from `TIMESTAMP`). Flask routes use a custom `json_response()` helper that applies this encoder.
+- Gunicorn runs with `-w 1` (single worker) so Prometheus in-memory metrics work without `prometheus_client.multiprocess`.
 
 ## Frontend gotchas
-- The only build step for the frontend image is `COPY index.html /usr/share/nginx/html/index.html` in the Dockerfile. Do not run `npm run build` expecting a real build.
+- Build pipeline: `npm install` → `vite build` → `dist/` output is copied into the nginx image via multi-stage Dockerfile. Do not edit `dist/` directly; always modify `src/` and rebuild.
 - `nginx.conf` defines a synthetic `/healthz` endpoint returning JSON. It **also proxies `/api/`** to the backend service (`bookstore-backend:80`), so the SPA works correctly through both Ingress and NodePort.
 - Because nginx proxies `/api/`, the `fetch('/api/books')` call works when accessed through Ingress (`bookstore.local`) **or** directly via NodePort (`:30080`).
+- `nginx.conf` uses `try_files $uri $uri/ /index.html;` to support Vue Router `createWebHistory` mode (client-side routing). No `#` hash mode required.
 - Container runs as UID `101` (`nginx` user). The Dockerfile pre-creates and `chown`s `/var/cache/nginx`, `/var/log/nginx`, and `/var/run/nginx.pid` to avoid permission errors.
 
 ## Advanced features
