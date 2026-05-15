@@ -77,7 +77,7 @@
 - **HPA (Horizontal Pod Autoscaler)**: `k8s/base/hpa.yaml` defines autoscaling for backend (min 2, max 5, target CPU 70%, memory 80%) and frontend (min 1, max 3, target CPU 70%). Requires `minikube addons enable metrics-server`.
 - **Prometheus-style metrics**: Backend exposes `GET /metrics` returning counters for `http_requests_total`, `http_request_duration_seconds`, `db_connections_success_total`, `db_connections_failed_total`, `orders_created_total`, `cart_items_added_total`.
 - **CI/CD**: `.github/workflows/ci.yml` runs lint (Hadolint, kubeconform), build (Docker Buildx), security scan (Trivy SARIF → GitHub Security tab), and Kustomize build check on every push/PR.
-- **Security scan**: `make scan` runs Trivy against local images. CI runs the same scan on every build. Trivy is configured with `exit-code: 1` and `ignore-unfixed: true` for CRITICAL/HIGH severity: unfixed vulnerabilities will fail the build, ensuring only actively patchable issues are surfaced.
+- **Security scan**: `make scan` runs Trivy against local images. CI runs the same scan on every build. Trivy is configured with `exit-code: 0` and `ignore-unfixed: true` for CRITICAL/HIGH severity: vulnerabilities are reported to the GitHub Security tab but do not fail the build. This is a pragmatic choice for a course project; in production, use `exit-code: 1` to block builds with patchable CVEs.
 
 ## Verification / demo
 - `scripts/demo-final.sh` performs end-to-end validation by `kubectl exec`-ing into the backend pod and querying `localhost:8000`. Useful for milestone demos.
