@@ -146,6 +146,20 @@ jobs:
           exit-code: 1
           ignore-unfixed: true
 
+      - name: Ensure SARIF files exist
+        if: always()
+        run: |
+          # Trivy may fail (exit-code: 1) before writing SARIF if vulnerabilities found.
+          # Create minimal valid SARIF stubs so upload-sarif never crashes.
+          for f in trivy-backend-results.sarif trivy-frontend-results.sarif; do
+            if [ ! -f "$f" ] || [ ! -s "$f" ]; then
+              echo "⚠️ $f missing or empty; creating stub"
+              cat > "$f" <<'EOF'
+          {"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[]}
+          EOF
+            fi
+          done
+
       - name: Upload backend scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
