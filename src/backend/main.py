@@ -7,8 +7,9 @@ Cloud-Native Bookstore Backend API
 - Full REST API: books, cart, orders
 - Prometheus-style /metrics endpoint
 """
-import os, json, sys, time, re, logging
+import os, json, sys, time, re, logging, signal, threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
 from collections import defaultdict
 
@@ -24,6 +25,7 @@ DB_CONFIG = {
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
+    from psycopg2 import pool
     DB_AVAILABLE = True
 except ImportError:
     DB_AVAILABLE = False
@@ -68,24 +70,43 @@ def _record_request(method, path, status, duration):
     METRICS['http_requests_total'][label] += 1
     METRICS['http_request_duration_seconds'][label] += duration
 
-# ================= Database Helpers =================
-def get_db_connection(max_retries=3, delay=2):
+# ================= Connection Pool =================
+db_pool = None
+
+def init_pool():
+    global db_pool
     if not DB_AVAILABLE:
+        return
+    try:
+        db_pool = pool.ThreadedConnectionPool(1, 20, **DB_CONFIG)
+        logger.info("DB connection pool initialized (min=1, max=20)")
+    except Exception as e:
+        logger.error(f"Failed to initialize DB pool: {e}")
+        db_pool = None
+
+def get_db_connection(max_retries=3, delay=2):
+    if not DB_AVAILABLE or db_pool is None:
         return None
     for attempt in range(max_retries):
         try:
-            conn = psycopg2.connect(**DB_CONFIG)
+            conn = db_pool.getconn()
+            if conn.closed:
+                db_pool.putconn(conn, close=True)
+                raise psycopg2.OperationalError("Connection was closed")
             conn.autocommit = True
             METRICS['db_connections_success_total'] += 1
-            logger.info("DB connection established")
             return conn
         except psycopg2.OperationalError as e:
             METRICS['db_connections_failed_total'] += 1
             if attempt == max_retries - 1:
                 logger.error(f"DB connection failed after {max_retries} attempts: {e}")
                 return None
-            logger.warning(f"DB attempt {attempt+1}/{max_retries} failed, retrying in {delay}s")
+            logger.warning(f"DB pool attempt {attempt+1}/{max_retries} failed, retrying in {delay}s")
             time.sleep(delay)
+
+def put_db_connection(conn):
+    if db_pool and conn:
+        db_pool.putconn(conn)
 
 def init_database():
     conn = get_db_connection()
@@ -104,6 +125,7 @@ def init_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_books_title ON books(title)")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS carts (
                 id SERIAL PRIMARY KEY,
@@ -153,7 +175,7 @@ def init_database():
             cur.execute("UPDATE books SET price = 0 WHERE price IS NULL OR price = 0")
             print("✅ Database already contains data", flush=True)
         cur.close()
-        conn.close()
+        put_db_connection(conn)
         return True
     except Exception as e:
         print(f"⚠️  DB init error: {e}", flush=True)
@@ -274,13 +296,17 @@ class BookstoreAPI(BaseHTTPRequestHandler):
 
             # 🗺️ Route: /healthz
             if path == '/healthz':
-                db_status = "connected" if get_db_connection() else "disconnected"
+                conn = get_db_connection()
+                db_status = "connected" if conn else "disconnected"
+                put_db_connection(conn)
                 self._send_json({"status": "healthy", "service": "backend", "db": db_status})
                 return 200
 
             # 🗺️ Route: /ready
             if path == '/ready':
-                db_ok = get_db_connection() is not None
+                conn = get_db_connection()
+                db_ok = conn is not None
+                put_db_connection(conn)
                 self._send_json(
                     {"status": "ready" if db_ok else "ready (fallback)", "dependencies": {"database": db_ok}}
                 )
@@ -293,7 +319,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                     cur = conn.cursor(cursor_factory=RealDictCursor)
                     cur.execute("SELECT id, title, author, isbn, price, created_at FROM books ORDER BY id")
                     books = [dict(row) for row in cur.fetchall()]
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"count": len(books), "books": books})
                 else:
                     self._send_json({"count": len(FALLBACK_BOOKS), "books": FALLBACK_BOOKS, "mode": "fallback"})
@@ -313,7 +339,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         (f'%{keyword}%', f'%{keyword}%')
                     )
                     results = [dict(r) for r in cur.fetchall()]
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"query": keyword, "count": len(results), "books": results})
                 else:
                     results = [b for b in FALLBACK_BOOKS if keyword in b['title'].lower() or keyword in b['author'].lower()]
@@ -328,7 +354,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                     cur = conn.cursor(cursor_factory=RealDictCursor)
                     cur.execute("SELECT * FROM books WHERE id = %s", (book_id,))
                     book = cur.fetchone()
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     if book:
                         self._send_json(dict(book))
                     else:
@@ -367,7 +393,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         items = [dict(r) for r in cur.fetchall()]
                         total = sum(i["price"] * i["quantity"] for i in items)
                         self._send_json({"session_id": session_id, "items": items, "total": round(total, 2)})
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                 else:
                     cart = _get_or_create_fallback_cart(session_id)
                     items = []
@@ -390,7 +416,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                     cur = conn.cursor(cursor_factory=RealDictCursor)
                     cur.execute("SELECT id, total_amount, status, created_at FROM orders WHERE session_id = %s ORDER BY id DESC", (session_id,))
                     orders = [dict(r) for r in cur.fetchall()]
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"session_id": session_id, "count": len(orders), "orders": orders})
                 else:
                     orders = FALLBACK_ORDERS.get(session_id, [])
@@ -406,7 +432,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                     cur.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
                     order = cur.fetchone()
                     if not order:
-                        cur.close(); conn.close()
+                        cur.close(); put_db_connection(conn)
                         self._send_error("not found", 404)
                         return 404
                     cur.execute("""
@@ -414,7 +440,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         FROM order_items WHERE order_id = %s
                     """, (order_id,))
                     items = [dict(r) for r in cur.fetchall()]
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     data = dict(order)
                     data["items"] = items
                     self._send_json(data)
@@ -470,7 +496,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         VALUES (%s, %s, %s)
                         ON CONFLICT (cart_id, book_id) DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity
                     """, (cart_id, book_id, quantity))
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"status": "added", "book_id": book_id, "quantity": quantity}, 201)
                 else:
                     cart = _get_or_create_fallback_cart(session_id)
@@ -494,7 +520,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                     cur.execute("SELECT id FROM carts WHERE session_id = %s", (session_id,))
                     row = cur.fetchone()
                     if not row:
-                        cur.close(); conn.close()
+                        cur.close(); put_db_connection(conn)
                         self._send_error("cart is empty", 400)
                         return 400
                     cart_id = row[0]
@@ -506,7 +532,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                     """, (cart_id,))
                     items = cur.fetchall()
                     if not items:
-                        cur.close(); conn.close()
+                        cur.close(); put_db_connection(conn)
                         self._send_error("cart is empty", 400)
                         return 400
                     total = sum(qty * price for _, qty, price, _, _ in items)
@@ -521,7 +547,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                             (order_id, book_id, qty, price, title, author)
                         )
                     cur.execute("DELETE FROM cart_items WHERE cart_id = %s", (cart_id,))
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"status": "created", "order_id": order_id, "total": float(total)}, 201)
                 else:
                     cart = _get_or_create_fallback_cart(session_id)
@@ -576,7 +602,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                         cur.execute("DELETE FROM cart_items WHERE id = %s", (item_id,))
                     else:
                         cur.execute("UPDATE cart_items SET quantity = %s WHERE id = %s", (quantity, item_id))
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"status": "updated", "item_id": item_id, "quantity": quantity})
                 else:
                     cart = _get_or_create_fallback_cart(session_id)
@@ -612,7 +638,7 @@ class BookstoreAPI(BaseHTTPRequestHandler):
                 if conn:
                     cur = conn.cursor()
                     cur.execute("DELETE FROM cart_items WHERE id = %s", (item_id,))
-                    cur.close(); conn.close()
+                    cur.close(); put_db_connection(conn)
                     self._send_json({"status": "deleted", "item_id": item_id})
                 else:
                     cart = _get_or_create_fallback_cart(session_id)
@@ -633,14 +659,33 @@ class BookstoreAPI(BaseHTTPRequestHandler):
         if APP_ENV == 'development':
             logger.info(format % args)
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle requests in a separate thread."""
+    daemon_threads = True
+
+# ================= Graceful Shutdown =================
+def shutdown_server(server):
+    def do_shutdown():
+        logger.info("SIGTERM received, initiating graceful shutdown...")
+        # Allow a short window for in-flight requests to complete
+        time.sleep(1)
+        server.shutdown()
+    threading.Thread(target=do_shutdown, daemon=True).start()
+
 # ================= Entry Point =================
 if __name__ == "__main__":
     print("🚀 Bookstore Backend starting...", flush=True)
+    init_pool()
     init_database()
     PORT = int(os.getenv('PORT', 8000))
     print(f"📡 Listening on 0.0.0.0:{PORT}", flush=True)
+    server = ThreadedHTTPServer(('0.0.0.0', PORT), BookstoreAPI)
+    signal.signal(signal.SIGTERM, lambda signum, frame: shutdown_server(server))
     try:
-        HTTPServer(('0.0.0.0', PORT), BookstoreAPI).serve_forever()
+        server.serve_forever()
     except KeyboardInterrupt:
-        print("\n🛑 Shutting down gracefully", flush=True)
+        pass
+    finally:
+        server.server_close()
+        logger.info("Server stopped gracefully")
         sys.exit(0)
