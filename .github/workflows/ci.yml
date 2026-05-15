@@ -127,7 +127,7 @@ jobs:
           cache-from: type=gha
 
       - name: Run Trivy vulnerability scanner (backend)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.21.0
         with:
           image-ref: bookstore-backend:scan
           format: sarif
@@ -136,7 +136,7 @@ jobs:
           exit-code: 0
 
       - name: Run Trivy vulnerability scanner (frontend)
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.21.0
         with:
           image-ref: bookstore-frontend:scan
           format: sarif
