@@ -1,2 +1,6 @@
 # src/backend/requirements.txt
 psycopg2-binary==2.9.9
+alembic==1.13.1
+sqlalchemy==2.0.30
+pytest==8.2.0
+pytest-cov==5.0.0

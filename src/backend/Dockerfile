@@ -7,9 +7,12 @@ WORKDIR /app
 
 # 安装 Python 依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ARG PIP_INDEX_URL=https://pypi.org/simple
+RUN pip install --no-cache-dir -r requirements.txt -i ${PIP_INDEX_URL} --timeout 120
 
 COPY main.py .
+COPY alembic.ini .
+COPY alembic/ ./alembic/
 
 # 创建非 root 用户
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app

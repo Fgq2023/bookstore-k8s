@@ -109,76 +109,25 @@ def put_db_connection(conn):
         db_pool.putconn(conn)
 
 def init_database():
+    """Verify DB connectivity. Schema management is handled by Alembic migrations."""
     conn = get_db_connection()
     if not conn:
         print("⚠️  Running without DB — fallback mode active", flush=True)
         return False
     try:
         cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS books (
-                id VARCHAR(10) PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                author VARCHAR(255) NOT NULL,
-                isbn VARCHAR(20),
-                price NUMERIC(10,2) DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_books_title ON books(title)")
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS carts (
-                id SERIAL PRIMARY KEY,
-                session_id VARCHAR(255) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS cart_items (
-                id SERIAL PRIMARY KEY,
-                cart_id INTEGER REFERENCES carts(id) ON DELETE CASCADE,
-                book_id VARCHAR(10) NOT NULL,
-                quantity INTEGER NOT NULL DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(cart_id, book_id)
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS orders (
-                id SERIAL PRIMARY KEY,
-                session_id VARCHAR(255) NOT NULL,
-                total_amount NUMERIC(10,2) DEFAULT 0,
-                status VARCHAR(50) DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS order_items (
-                id SERIAL PRIMARY KEY,
-                order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
-                book_id VARCHAR(10) NOT NULL,
-                quantity INTEGER NOT NULL,
-                price NUMERIC(10,2) NOT NULL,
-                title VARCHAR(255),
-                author VARCHAR(255)
-            )
-        """)
         cur.execute("SELECT COUNT(*) FROM books")
-        if cur.fetchone()[0] == 0:
-            sample = [(b["id"], b["title"], b["author"], b["isbn"], b.get("price", 0)) for b in FALLBACK_BOOKS]
-            cur.executemany(
-                "INSERT INTO books (id, title, author, isbn, price) VALUES (%s, %s, %s, %s, %s)", sample
-            )
-            print("✅ Database initialized with sample books", flush=True)
-        else:
-            # Ensure price column exists on existing data
-            cur.execute("UPDATE books SET price = 0 WHERE price IS NULL OR price = 0")
-            print("✅ Database already contains data", flush=True)
+        count = cur.fetchone()[0]
         cur.close()
         put_db_connection(conn)
+        if count == 0:
+            print("⚠️  DB connected but no books found. Run 'alembic upgrade head' to initialize schema.", flush=True)
+        else:
+            print(f"✅ DB connected ({count} books)", flush=True)
         return True
     except Exception as e:
-        print(f"⚠️  DB init error: {e}", flush=True)
+        print(f"⚠️  DB connectivity check failed: {e}", flush=True)
+        put_db_connection(conn)
         return False
 
 # ================= Fallback Helpers =================

@@ -1,0 +1,29 @@
+Generic single-database configuration with raw SQL migrations.
+
+## Usage
+
+### Create a new migration
+```bash
+cd src/backend
+alembic revision -m "describe change"
+# Edit alembic/versions/xxx_describe_change.py
+```
+
+### Run migrations
+```bash
+alembic upgrade head
+```
+
+### Rollback one migration
+```bash
+alembic downgrade -1
+```
+
+### View current version
+```bash
+alembic current
+```
+
+## In Kubernetes
+Migrations run automatically in an initContainer before the backend starts.
+See `k8s/base/deployment-backend.yaml`.
