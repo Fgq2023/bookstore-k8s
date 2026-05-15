@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt -i ${PIP_INDEX_URL} --timeout
 # ─── Stage 2: Runtime ───
 FROM python:3.11-slim AS runtime
 
+# Patch base image vulnerabilities (system packages)
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy virtual environment from builder

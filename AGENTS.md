@@ -87,3 +87,4 @@
 - `runAsUser` values: backend `1000`, frontend `101`, postgres `70`.
 - **NetworkPolicy** isolates traffic: frontend only accepts from Ingress Controller and egresses to backend; backend only accepts from frontend and egresses to DB; DB only accepts from backend.
 - **HEALTHCHECK** is present in both backend (`/ready`) and frontend (`/healthz`) Dockerfiles for runtime health monitoring.
+- **Base image patching**: Both Dockerfiles run `apt-get upgrade` (backend) / `apk upgrade` (frontend) during build to patch known system vulnerabilities before deployment.

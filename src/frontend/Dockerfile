@@ -1,6 +1,9 @@
 # src/frontend/Dockerfile
 FROM nginx:1.25-alpine
 
+# Patch base image vulnerabilities
+RUN apk upgrade --no-cache
+
 # 删除默认配置
 RUN rm -f /etc/nginx/conf.d/default.conf
 
