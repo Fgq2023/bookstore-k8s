@@ -46,12 +46,11 @@
   kubectl rollout restart deployment/bookstore-backend -n bookstore
   kubectl rollout restart deployment/bookstore-frontend -n bookstore
   ```
-- NetworkPolicy `networkpolicy-db.yaml` restricts DB access to the backend.
+- NetworkPolicy zero-trust mesh: `networkpolicy-db.yaml` (DB←backend), `networkpolicy-frontend.yaml` (Ingress→frontend→backend only), `networkpolicy-backend.yaml` (frontend→backend→DB only). **Minikube caveat**: the default bridge CNI does not enforce NetworkPolicy. To test/verify policies, start Minikube with `--cni=calico` (or another CNI that supports NetworkPolicy).
 
 ## Backend gotchas
 - **Environment variables**: `main.py` reads `DB_HOST`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. It also reads `APP_ENV` (default: `development`) and `LOG_LEVEL` (default: `info`). It does **not** read `DATABASE_URL`.
-- **Deployment now injects DB credentials from Secret**: `deployment-backend.yaml` uses `valueFrom.secretKeyRef` to inject `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from the `db-credentials` Secret. Hardcoded defaults in `main.py` remain as fallback.
-- Default DB credentials in code: `bookstore_user` / `SecureP@ssw0rd!2026` @ `bookstore-db:5432/bookstore`.
+- **Deployment now injects DB credentials from Secret**: `deployment-backend.yaml` uses `valueFrom.secretKeyRef` to inject `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from the `db-credentials` Secret. `main.py` no longer contains hardcoded credentials; if environment variables are absent, it falls back to in-memory mode automatically.
 - API endpoints:
   - `GET /healthz` — liveness probe (returns DB connectivity status)
   - `GET /ready` — readiness probe (returns `"ready"` or `"ready (fallback)"` with HTTP 200; never returns 503 to avoid K8s removing the pod from endpoints during temporary DB downtime)
@@ -78,7 +77,7 @@
 - **HPA (Horizontal Pod Autoscaler)**: `k8s/base/hpa.yaml` defines autoscaling for backend (min 2, max 5, target CPU 70%, memory 80%) and frontend (min 1, max 3, target CPU 70%). Requires `minikube addons enable metrics-server`.
 - **Prometheus-style metrics**: Backend exposes `GET /metrics` returning counters for `http_requests_total`, `http_request_duration_seconds`, `db_connections_success_total`, `db_connections_failed_total`, `orders_created_total`, `cart_items_added_total`.
 - **CI/CD**: `.github/workflows/ci.yml` runs lint (Hadolint, kubeconform), build (Docker Buildx), security scan (Trivy SARIF → GitHub Security tab), and Kustomize build check on every push/PR.
-- **Security scan**: `make scan` runs Trivy against local images. CI runs the same scan on every build.
+- **Security scan**: `make scan` runs Trivy against local images. CI runs the same scan on every build. Trivy is configured with `exit-code: 1` and `ignore-unfixed: true` for CRITICAL/HIGH severity: unfixed vulnerabilities will fail the build, ensuring only actively patchable issues are surfaced.
 
 ## Verification / demo
 - `scripts/demo-final.sh` performs end-to-end validation by `kubectl exec`-ing into the backend pod and querying `localhost:8000`. Useful for milestone demos.
@@ -86,3 +85,5 @@
 ## Security conventions
 - All containers run as non-root with dropped capabilities (`drop: ["ALL"]`).
 - `runAsUser` values: backend `1000`, frontend `101`, postgres `70`.
+- **NetworkPolicy** isolates traffic: frontend only accepts from Ingress Controller and egresses to backend; backend only accepts from frontend and egresses to DB; DB only accepts from backend.
+- **HEALTHCHECK** is present in both backend (`/ready`) and frontend (`/healthz`) Dockerfiles for runtime health monitoring.

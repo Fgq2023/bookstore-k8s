@@ -18,8 +18,8 @@ DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'bookstore-db'),
     'port': os.getenv('DB_PORT', '5432'),
     'dbname': os.getenv('POSTGRES_DB', 'bookstore'),
-    'user': os.getenv('POSTGRES_USER', 'bookstore_user'),
-    'password': os.getenv('POSTGRES_PASSWORD', 'SecureP@ssw0rd!2026')
+    'user': os.getenv('POSTGRES_USER'),
+    'password': os.getenv('POSTGRES_PASSWORD')
 }
 
 try:

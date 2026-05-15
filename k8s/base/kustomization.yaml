@@ -11,6 +11,8 @@ resources:
   - deployment-postgres.yaml  
   - service-postgres.yaml 
   - networkpolicy-db.yaml
+  - networkpolicy-frontend.yaml
+  - networkpolicy-backend.yaml
   - service-backend.yaml
   - service-frontend.yaml
   - deployment-backend.yaml

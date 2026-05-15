@@ -1,22 +1,40 @@
 # src/backend/Dockerfile
-FROM python:3.11-slim
+# Multi-stage build for smaller image and reduced attack surface
+
+# ─── Stage 1: Builder ───
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
+RUN python -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 
-# psycopg2-binary 使用预编译 wheel，无需编译器
-
-# 安装 Python 依赖
 COPY requirements.txt .
 ARG PIP_INDEX_URL=https://pypi.org/simple
 RUN pip install --no-cache-dir -r requirements.txt -i ${PIP_INDEX_URL} --timeout 120
 
+# ─── Stage 2: Runtime ───
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /app/venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Copy application code
 COPY main.py .
 COPY alembic.ini .
 COPY alembic/ ./alembic/
 
-# 创建非 root 用户
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Create non-root user and fix ownership
+RUN useradd -m -u 1000 appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
+
+# Healthcheck using the /ready endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')" || exit 1
+
 CMD ["python3", "-u", "main.py"]
