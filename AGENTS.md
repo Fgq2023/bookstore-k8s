@@ -74,13 +74,22 @@
 - Container runs as UID `101` (`nginx` user). The Dockerfile pre-creates and `chown`s `/var/cache/nginx`, `/var/log/nginx`, and `/var/run/nginx.pid` to avoid permission errors.
 
 ## Advanced features
-- **HPA (Horizontal Pod Autoscaler)**: `k8s/base/hpa.yaml` defines autoscaling for backend (min 2, max 5, target CPU 70%, memory 80%) and frontend (min 1, max 3, target CPU 70%). Requires `minikube addons enable metrics-server`.
-- **Prometheus-style metrics**: Backend exposes `GET /metrics` returning counters for `http_requests_total`, `http_request_duration_seconds`, `db_connections_success_total`, `db_connections_failed_total`, `orders_created_total`, `cart_items_added_total`.
+- **HPA (Horizontal Pod Autoscaler)**: `k8s/base/hpa.yaml` defines autoscaling for backend (min 2, max 5, target CPU 70%, memory 80%) and frontend (min 1, max 3, target CPU 70%). Requires `minikube addons enable metrics-server`. Verified with k6 load test: backend scales 2→5 under 150 VUs.
+- **Prometheus-style metrics**: Backend exposes `GET /metrics` returning counters for `http_requests_total`, `http_request_duration_seconds`, `db_connections_success_total`, `db_connections_failed_total`, `orders_created_total`, `cart_items_added_total`. Scraped by kube-prometheus-stack via ServiceMonitor.
+- **Grafana Dashboard**: `k8s/base/grafana-dashboard.yaml` provisions a 4-panel dashboard (HTTP rate, latency, DB connections, business metrics). Deploy to `monitoring` namespace via `make deploy-monitoring`.
 - **CI/CD**: `.github/workflows/ci.yml` runs lint (Hadolint, kubeconform), build (Docker Buildx), security scan (Trivy SARIF → GitHub Security tab), and Kustomize build check on every push/PR.
 - **Security scan**: `make scan` runs Trivy against local images. CI runs the same scan on every build. Trivy is configured with `exit-code: 0` and `ignore-unfixed: true` for CRITICAL/HIGH severity: vulnerabilities are reported to the GitHub Security tab but do not fail the build. This is a pragmatic choice for a course project; in production, use `exit-code: 1` to block builds with patchable CVEs.
+- **Database Schema v2**: Alembic migration `002` adds `updated_at` (auto-updating triggers), `stock_quantity` to books, `status_history` JSONB to orders, and `CHECK` constraint for order statuses (`pending`, `confirmed`, `shipped`, `delivered`, `cancelled`).
+- **Inventory Management**: Orders check stock before creation and atomically deduct quantities. Returns 400 if stock is insufficient.
+- **Order State Machine**: Orders are created with `status='pending'`, then transition to `confirmed` after stock deduction. Full `status_history` audit trail is persisted.
+- **JSON Structured Logging**: Backend uses `python-json-logger` in production mode (`APP_ENV=production`) for structured logs compatible with Loki/ELK.
 
 ## Verification / demo
-- `scripts/demo-final.sh` performs end-to-end validation by `kubectl exec`-ing into the backend pod and querying `localhost:8000`. Useful for milestone demos.
+- `scripts/demo-final.sh` performs end-to-end validation: pod status, metrics, inventory/state-machine, HPA scaling, security policies.
+- `scripts/loadtest.js` (k6): full shopping flow simulation with thresholds.
+- `scripts/loadtest-hpa.js` (k6): high-intensity load to trigger HPA scaling.
+- `make load-test`: runs k6 via Docker against the Minikube NodePort.
+- `make port-forward-prometheus` / `make port-forward-grafana`: quick access to observability UIs.
 
 ## Security conventions
 - All containers run as non-root with dropped capabilities (`drop: ["ALL"]`).
