@@ -29,7 +29,11 @@ COPY --from=builder /app/venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Copy application code
+COPY app.py .
 COPY main.py .
+COPY schemas.py .
+COPY routes/ ./routes/
+COPY utils/ ./utils/
 COPY alembic.ini .
 COPY alembic/ ./alembic/
 
