@@ -1,10 +1,29 @@
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { store } from '../store'
+import { isLoggedIn, clearToken } from '../api/client'
 
 const route = useRoute()
+const router = useRouter()
 const current = computed(() => route.name)
+const loggedIn = ref(isLoggedIn())
+
+function updateAuth() {
+  loggedIn.value = isLoggedIn()
+}
+
+function logout() {
+  clearToken()
+  router.push('/login')
+}
+
+onMounted(() => {
+  window.addEventListener('auth-changed', updateAuth)
+})
+onUnmounted(() => {
+  window.removeEventListener('auth-changed', updateAuth)
+})
 </script>
 
 <template>
@@ -13,7 +32,7 @@ const current = computed(() => route.name)
       <router-link to="/" class="text-xl font-bold text-blue-600 tracking-tight hover:opacity-80 transition-opacity">
         📚 Cloud Bookstore
       </router-link>
-      <div class="flex gap-1">
+      <div class="flex gap-1 items-center">
         <router-link
           to="/"
           class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -41,6 +60,37 @@ const current = computed(() => route.name)
         >
           📦 Orders
         </router-link>
+
+        <div v-if="loggedIn" class="flex items-center gap-1 ml-2 pl-2 border-l border-slate-200">
+          <router-link
+            to="/profile"
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            :class="current === 'profile' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'"
+          >
+            👤 Profile
+          </router-link>
+          <button
+            @click="logout"
+            class="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-600 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+        <div v-else class="flex items-center gap-1 ml-2 pl-2 border-l border-slate-200">
+          <router-link
+            to="/login"
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            :class="current === 'login' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'"
+          >
+            Sign In
+          </router-link>
+          <router-link
+            to="/register"
+            class="px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            Sign Up
+          </router-link>
+        </div>
       </div>
     </nav>
   </header>

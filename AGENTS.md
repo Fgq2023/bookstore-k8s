@@ -92,6 +92,33 @@
 - `make load-test`: runs k6 via Docker against the Minikube NodePort.
 - `make port-forward-prometheus` / `make port-forward-grafana`: quick access to observability UIs.
 
+## Phase 3 Milestones (M3-M6)
+
+### M3 — Security Hardening
+- **JWT Authentication**: PyJWT-based auth with `/api/auth/register`, `/api/auth/login`, `/api/auth/me`. Passwords hashed with Werkzeug. Token expiry: 24h.
+- **Rate Limiting**: Flask-Limiter (memory backend, single-worker safe). Register: 5/min, Login: 10/min, Default: 200/min.
+- **Security Headers**: All responses include `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Strict-Transport-Security`, `Referrer-Policy`.
+- **CORS**: Restricted to `localhost:5173`, `localhost:3000`, `bookstore.local` instead of wildcard.
+- **Frontend Auth**: Login/Register/Profile pages, Axios interceptors for JWT injection, route guards (`beforeEach`), global auth state via `localStorage` + custom events.
+- **Admin Route Protection**: `/api/admin/*` requires `is_admin=True` in JWT payload. Returns 403 for non-admins.
+
+### M4 — High Availability Design
+- **Graceful Shutdown**: Flask catches `SIGTERM`/`SIGINT`, closes DB pool, exits cleanly. Gunicorn runs with `--graceful-timeout 30 --timeout 120`.
+- **Three-Tier Probes**: `startupProbe` (`/startup`, 60s max), `livenessProbe` (`/healthz`), `readinessProbe` (`/ready`). Startup probe prevents premature liveness failures during Alembic init.
+- **PDB**: `PodDisruptionBudget` ensures min 1 replica available for backend and frontend during node drains.
+- **Multi-replica**: Backend runs 2 replicas by default; HPA scales 2→5 under load.
+
+### M5 — Performance Optimization
+- **Database Indexes** (Alembic 004): `idx_books_title_author`, `idx_books_isbn`, `idx_orders_session_created`, `idx_cart_items_cart_book`, `idx_order_items_order`.
+- **API Pagination**: `/api/books` and `/api/orders` support `?page=N&per_page=M` (max 100). Returns `{count, total, page, per_page, books/orders}`.
+- **In-Memory Cache**: 60-second TTL cache for book list pages (`cache_get`/`cache_set`). Falls back to DB on cache miss.
+- **k6 Load Test**: `scripts/loadtest-v3.js` tests pagination + auth + payment under 50 VUs. p(95) latency < 2ms.
+
+### M6 — Feature Completeness
+- **Payment Mock**: `POST /api/payments` simulates payment gateway. Transitions order `confirmed` → `shipped` with full `status_history` audit.
+- **Admin Dashboard**: `/admin` route displays raw `/metrics` output (admin-only). Simplified management interface.
+- **User Profile**: `/profile` shows user info + order history with status color badges.
+
 ## Security conventions
 - All containers run as non-root with dropped capabilities (`drop: ["ALL"]`).
 - `runAsUser` values: backend `1000`, frontend `101`, postgres `70`.

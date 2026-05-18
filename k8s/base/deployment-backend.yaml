@@ -23,7 +23,7 @@ spec:
         fsGroup: 1000
       initContainers:
       - name: db-migrate
-        image: bookstore-backend:v1.5.0
+        image: bookstore-backend:v3.0.3
         imagePullPolicy: Never
         command: ["alembic", "upgrade", "head"]
         env:
@@ -66,11 +66,18 @@ spec:
         - containerPort: 8000
           name: http
           protocol: TCP
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12  # 5*12=60s max startup time
         livenessProbe:
           httpGet:
             path: /healthz
             port: 8000
-          initialDelaySeconds: 15
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
@@ -78,7 +85,6 @@ spec:
           httpGet:
             path: /ready
             port: 8000
-          initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 2
           failureThreshold: 3

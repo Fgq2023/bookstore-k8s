@@ -12,6 +12,7 @@ from urllib.parse import urlparse, parse_qs
 from collections import defaultdict
 
 from flask import Flask, request, Response
+from functools import wraps
 
 # ================= DB Configuration =================
 DB_CONFIG = {
@@ -21,6 +22,11 @@ DB_CONFIG = {
     'user': os.getenv('POSTGRES_USER'),
     'password': os.getenv('POSTGRES_PASSWORD')
 }
+
+# ================= Security Configuration =================
+JWT_SECRET = os.getenv('JWT_SECRET', 'bookstore-dev-secret-change-in-production')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRY_HOURS = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
 
 try:
     import psycopg2
@@ -33,6 +39,25 @@ except ImportError:
 
 # ================= Flask App =================
 app = Flask(__name__)
+
+# ================= Graceful Shutdown =================
+shutdown_requested = False
+
+def handle_signal(signum, frame):
+    global shutdown_requested
+    shutdown_requested = True
+    logger.info(f"Received signal {signum}, starting graceful shutdown...")
+    global db_pool
+    if db_pool:
+        try:
+            db_pool.closeall()
+            logger.info("DB connection pool closed")
+        except Exception as e:
+            logger.warning(f"Error closing pool: {e}")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_signal)
+signal.signal(signal.SIGINT, handle_signal)
 
 # ================= Sample Data =================
 FALLBACK_BOOKS = [
@@ -74,6 +99,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger('bookstore')
 
+# ================= Rate Limiting =================
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(
+        key_func=get_remote_address,
+        app=app,
+        default_limits=["200 per minute", "50 per 10 seconds"],
+        storage_uri="memory://",
+        strategy="fixed-window"
+    )
+    logger.info("Rate limiter initialized (memory backend)")
+except ImportError:
+    limiter = None
+    logger.warning("Flask-Limiter not installed, rate limiting disabled")
+
+def rate_limit(limit_str):
+    if limiter:
+        return limiter.limit(limit_str)
+    return lambda f: f
+
 # ================= Metrics =================
 METRICS = {
     'http_requests_total': defaultdict(int),
@@ -88,6 +134,20 @@ def _record_request(method, path, status, duration):
     label = f'method="{method}",path="{path}",status="{status}"'
     METRICS['http_requests_total'][label] += 1
     METRICS['http_request_duration_seconds'][label] += duration
+
+# ================= In-Memory Cache =================
+_cache = {}
+
+def cache_get(key):
+    entry = _cache.get(key)
+    if entry and time.time() < entry['expires']:
+        return entry['value']
+    if key in _cache:
+        del _cache[key]
+    return None
+
+def cache_set(key, value, ttl_seconds=60):
+    _cache[key] = {'value': value, 'expires': time.time() + ttl_seconds}
 
 # ================= JSON Encoder =================
 class DecimalEncoder(json.JSONEncoder):
@@ -191,9 +251,72 @@ def after_request(response):
     label = f'method="{request.method}",path="{request.path}",status="{response.status_code}"'
     METRICS['http_requests_total'][label] += 1
     METRICS['http_request_duration_seconds'][label] += duration
+    # Security headers
+    response.headers.add('X-Content-Type-Options', 'nosniff')
+    response.headers.add('X-Frame-Options', 'DENY')
+    response.headers.add('X-XSS-Protection', '1; mode=block')
+    response.headers.add('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    response.headers.add('Referrer-Policy', 'strict-origin-when-cross-origin')
+    # CORS: allow specific origins in dev
     if request.path != '/metrics':
-        response.headers.add('Access-Control-Allow-Origin', '*')
+        origin = request.headers.get('Origin', '')
+        allowed = ['http://localhost:5173', 'http://localhost:3000', 'http://bookstore.local']
+        if any(origin.startswith(a) for a in allowed) or not origin:
+            response.headers.add('Access-Control-Allow-Origin', origin or '*')
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+            response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
     return response
+
+# ================= JWT Helpers =================
+def generate_token(user_id, username, is_admin=False):
+    import jwt as pyjwt
+    payload = {
+        'user_id': user_id,
+        'username': username,
+        'is_admin': is_admin,
+        'exp': time.time() + JWT_EXPIRY_HOURS * 3600,
+        'iat': time.time()
+    }
+    return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_token(token):
+    import jwt as pyjwt
+    try:
+        return pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except Exception:
+        return None
+
+def jwt_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return json_response({"success": False, "error": {"code": "UNAUTHORIZED", "message": "Missing or invalid Authorization header"}}, 401)
+        token = auth_header.split(' ', 1)[1]
+        payload = verify_token(token)
+        if not payload:
+            return json_response({"success": False, "error": {"code": "UNAUTHORIZED", "message": "Invalid or expired token"}}, 401)
+        request.current_user = payload
+        return f(*args, **kwargs)
+    return decorated
+
+# ================= Error Handlers =================
+@app.errorhandler(404)
+def not_found(e):
+    return json_response({"success": False, "error": {"code": "NOT_FOUND", "message": "Resource not found"}}, 404)
+
+@app.errorhandler(500)
+def internal_error(e):
+    logger.exception("Unhandled 500 error")
+    return json_response({"success": False, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}}, 500)
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    from flask_limiter.errors import RateLimitExceeded
+    if isinstance(e, RateLimitExceeded):
+        return json_response({"success": False, "error": {"code": "RATE_LIMITED", "message": str(e)}}, 429)
+    logger.exception("Unhandled exception")
+    return json_response({"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}, 500)
 
 # ================= Routes =================
 
@@ -223,8 +346,21 @@ def metrics():
     lines.append("")
     return Response("\n".join(lines), mimetype='text/plain; version=0.0.4; charset=utf-8')
 
+@app.route('/startup', methods=['GET'])
+def startup():
+    """Startup probe: verifies DB pool can be initialized."""
+    if not DB_AVAILABLE:
+        return json_response({"status": "ok", "db": "unavailable"}, 200)
+    conn = get_db_connection()
+    if conn:
+        put_db_connection(conn)
+        return json_response({"status": "ok", "db": "connected"}, 200)
+    return json_response({"status": "ok", "db": "fallback"}, 200)
+
 @app.route('/healthz', methods=['GET'])
 def healthz():
+    if shutdown_requested:
+        return json_response({"status": "unhealthy", "reason": "shutting down"}, 503)
     conn = get_db_connection()
     db_status = "connected" if conn else "disconnected"
     put_db_connection(conn)
@@ -241,15 +377,39 @@ def ready():
 
 @app.route('/api/books', methods=['GET'])
 def get_books():
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)
+    if page < 1:
+        page = 1
+    cache_key = f"books_list:{page}:{per_page}"
+    cached = cache_get(cache_key)
+    if cached:
+        return json_response(cached)
+
     conn = get_db_connection()
     if conn:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT id, title, author, isbn, price, stock_quantity, created_at, updated_at FROM books ORDER BY id")
+        # Get total count
+        cur.execute("SELECT COUNT(*) AS cnt FROM books")
+        total = cur.fetchone()['cnt']
+        offset = (page - 1) * per_page
+        cur.execute("""
+            SELECT id, title, author, isbn, price, stock_quantity, created_at, updated_at
+            FROM books ORDER BY id LIMIT %s OFFSET %s
+        """, (per_page, offset))
         books = [dict(row) for row in cur.fetchall()]
         cur.close(); put_db_connection(conn)
-        return json_response({"count": len(books), "books": books})
+        result = {
+            "count": len(books),
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "books": books
+        }
+        cache_set(cache_key, result, ttl_seconds=60)
+        return json_response(result)
     else:
-        return json_response({"count": len(FALLBACK_BOOKS), "books": FALLBACK_BOOKS, "mode": "fallback"})
+        return json_response({"count": len(FALLBACK_BOOKS), "total": len(FALLBACK_BOOKS), "page": 1, "per_page": per_page, "books": FALLBACK_BOOKS, "mode": "fallback"})
 
 @app.route('/api/books/search', methods=['GET'])
 def search_books():
@@ -412,16 +572,29 @@ def orders():
         session_id = request.args.get('session_id', '')
         if not session_id:
             return json_response({"error": "missing session_id"}, 400)
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 20, type=int), 100)
+        if page < 1:
+            page = 1
+        offset = (page - 1) * per_page
         conn = get_db_connection()
         if conn:
             cur = conn.cursor(cursor_factory=RealDictCursor)
-            cur.execute("SELECT id, total_amount, status, created_at, updated_at, status_history FROM orders WHERE session_id = %s ORDER BY id DESC", (session_id,))
+            cur.execute("SELECT COUNT(*) AS cnt FROM orders WHERE session_id = %s", (session_id,))
+            total = cur.fetchone()['cnt']
+            cur.execute("""
+                SELECT id, total_amount, status, created_at, updated_at, status_history
+                FROM orders WHERE session_id = %s ORDER BY id DESC LIMIT %s OFFSET %s
+            """, (session_id, per_page, offset))
             orders = [dict(r) for r in cur.fetchall()]
             cur.close(); put_db_connection(conn)
-            return json_response({"session_id": session_id, "count": len(orders), "orders": orders})
+            return json_response({
+                "session_id": session_id, "count": len(orders), "total": total,
+                "page": page, "per_page": per_page, "orders": orders
+            })
         else:
             orders = FALLBACK_ORDERS.get(session_id, [])
-            return json_response({"session_id": session_id, "count": len(orders), "orders": orders, "mode": "fallback"})
+            return json_response({"session_id": session_id, "count": len(orders), "total": len(orders), "page": 1, "per_page": per_page, "orders": orders, "mode": "fallback"})
 
     else:  # POST
         body = request.get_json(silent=True) or {}
@@ -514,6 +687,127 @@ def orders():
             METRICS['orders_created_total'] += 1
             return json_response({"status": "created", "order_id": order_id, "total": round(total, 2), "mode": "fallback"}, 201)
 
+# ================= Auth Routes =================
+@app.route('/api/auth/register', methods=['POST'])
+@rate_limit("5 per minute")
+def register():
+    body = request.get_json(silent=True) or {}
+    username = body.get('username', '').strip()
+    email = body.get('email', '').strip()
+    password = body.get('password', '')
+    if not username or not email or not password:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": "username, email and password are required"}}, 400)
+    if len(password) < 6:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": "Password must be at least 6 characters"}}, 400)
+    from werkzeug.security import generate_password_hash
+    password_hash = generate_password_hash(password)
+    conn = get_db_connection()
+    if conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) RETURNING id",
+                (username, email, password_hash)
+            )
+            user_id = cur.fetchone()[0]
+            cur.close(); put_db_connection(conn)
+            token = generate_token(user_id, username)
+            return json_response({"success": True, "data": {"user_id": user_id, "username": username, "token": token}}, 201)
+        except psycopg2.IntegrityError:
+            cur.close(); put_db_connection(conn)
+            return json_response({"success": False, "error": {"code": "CONFLICT", "message": "Username or email already exists"}}, 409)
+    else:
+        return json_response({"success": False, "error": {"code": "SERVICE_UNAVAILABLE", "message": "DB unavailable, cannot register"}}, 503)
+
+@app.route('/api/auth/login', methods=['POST'])
+@rate_limit("10 per minute")
+def login():
+    body = request.get_json(silent=True) or {}
+    username = body.get('username', '').strip()
+    password = body.get('password', '')
+    if not username or not password:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": "username and password are required"}}, 400)
+    from werkzeug.security import check_password_hash
+    conn = get_db_connection()
+    if conn:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT id, username, password_hash, is_admin FROM users WHERE username = %s", (username,))
+        user = cur.fetchone()
+        cur.close(); put_db_connection(conn)
+        if not user or not check_password_hash(user['password_hash'], password):
+            return json_response({"success": False, "error": {"code": "UNAUTHORIZED", "message": "Invalid credentials"}}, 401)
+        token = generate_token(user['id'], user['username'], user['is_admin'])
+        return json_response({"success": True, "data": {"user_id": user['id'], "username": user['username'], "is_admin": user['is_admin'], "token": token}})
+    else:
+        return json_response({"success": False, "error": {"code": "SERVICE_UNAVAILABLE", "message": "DB unavailable"}}, 503)
+
+@app.route('/api/auth/me', methods=['GET'])
+@jwt_required
+def get_me():
+    user = request.current_user
+    return json_response({"success": True, "data": {"user_id": user['user_id'], "username": user['username'], "is_admin": user.get('is_admin', False)}})
+
+# ================= Payment Mock Routes =================
+@app.route('/api/payments', methods=['POST'])
+def create_payment():
+    """Mock payment gateway: processes payment for an order."""
+    body = request.get_json(silent=True) or {}
+    order_id = body.get('order_id')
+    if not order_id:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": "order_id is required"}}, 400)
+    conn = get_db_connection()
+    if conn:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT status FROM orders WHERE id = %s", (order_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close(); put_db_connection(conn)
+            return json_response({"success": False, "error": {"code": "NOT_FOUND", "message": "Order not found"}}, 404)
+        if row['status'] != 'confirmed':
+            cur.close(); put_db_connection(conn)
+            return json_response({"success": False, "error": {"code": "INVALID_STATE", "message": f"Order is {row['status']}, cannot pay"}}, 400)
+        # Mock payment success
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        cur.execute(
+            "UPDATE orders SET status = %s, status_history = status_history || %s::jsonb WHERE id = %s",
+            ('shipped', json.dumps({"status": "shipped", "at": now_iso}), order_id)
+        )
+        cur.close(); put_db_connection(conn)
+        return json_response({"success": True, "data": {"order_id": order_id, "payment_status": "paid", "order_status": "shipped"}})
+    return json_response({"success": False, "error": {"code": "SERVICE_UNAVAILABLE", "message": "DB unavailable"}}, 503)
+
+# ================= Admin Routes =================
+@app.route('/api/admin/orders/<int:order_id>/status', methods=['PUT'])
+@jwt_required
+def update_order_status(order_id):
+    """Admin only: update order status manually."""
+    if not request.current_user.get('is_admin'):
+        return json_response({"success": False, "error": {"code": "FORBIDDEN", "message": "Admin access required"}}, 403)
+    body = request.get_json(silent=True) or {}
+    new_status = body.get('status')
+    allowed = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+    if new_status not in allowed:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": f"Status must be one of {allowed}"}}, 400)
+    conn = get_db_connection()
+    if conn:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT status FROM orders WHERE id = %s", (order_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close(); put_db_connection(conn)
+            return json_response({"success": False, "error": {"code": "NOT_FOUND", "message": "Order not found"}}, 404)
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        cur.execute(
+            "UPDATE orders SET status = %s, status_history = status_history || %s::jsonb WHERE id = %s",
+            (new_status, json.dumps({"status": new_status, "at": now_iso}), order_id)
+        )
+        cur.close(); put_db_connection(conn)
+        # Invalidate caches
+        _cache.pop(f"order:{order_id}", None)
+        return json_response({"success": True, "data": {"order_id": order_id, "status": new_status}})
+    return json_response({"success": False, "error": {"code": "SERVICE_UNAVAILABLE", "message": "DB unavailable"}}, 503)
+
+# ================= Order Routes =================
 @app.route('/api/orders/<int:order_id>', methods=['GET'])
 def get_order(order_id):
     conn = get_db_connection()
