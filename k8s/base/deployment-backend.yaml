@@ -23,7 +23,7 @@ spec:
         fsGroup: 1000
       initContainers:
       - name: db-migrate
-        image: bookstore-backend:v3.0.3
+        image: bookstore-backend:dev
         imagePullPolicy: Never
         command: ["alembic", "upgrade", "head"]
         env:
@@ -60,7 +60,7 @@ spec:
           runAsUser: 1000
       containers:
       - name: backend
-        image: bookstore-backend:v1.1
+        image: bookstore-backend:dev
         imagePullPolicy: Never
         ports:
         - containerPort: 8000
@@ -116,7 +116,7 @@ spec:
               name: db-credentials
               key: POSTGRES_PASSWORD
         - name: APP_ENV
-          value: "development"
+          value: "production"
         - name: LOG_LEVEL
           value: "info"
         securityContext:

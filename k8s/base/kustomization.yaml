@@ -20,7 +20,6 @@ resources:
   - ingress.yaml
   - hpa.yaml
   - pdb.yaml
-  - servicemonitor.yaml
 
 labels:
   - pairs:

@@ -75,6 +75,27 @@ status: ## 快速查看所有组件状态
 	@echo "=== Ingress ==="
 	kubectl get ingress -n bookstore
 
+verify: ## 端到端验证（Pod 状态 + API 健康检查）
+	@echo "🔍 Verifying deployment..."
+	@kubectl get pods -n bookstore -l app.kubernetes.io/part-of=bookstore -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}'
+	@echo ""
+	@echo "🩺 Health checks..."
+	@BACKEND_POD=$$(kubectl get pod -n bookstore -l app=bookstore-backend -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+	if [ -n "$$BACKEND_POD" ]; then \
+		echo "Backend /healthz: $$(kubectl exec -n bookstore $$BACKEND_POD -- wget -qO- http://localhost:8000/healthz 2>/dev/null || echo 'unavailable')"; \
+		echo "Backend /ready:   $$(kubectl exec -n bookstore $$BACKEND_POD -- wget -qO- http://localhost:8000/ready 2>/dev/null || echo 'unavailable')"; \
+	else \
+		echo "❌ No backend pod found"; \
+	fi
+	@FRONTEND_POD=$$(kubectl get pod -n bookstore -l app=bookstore-frontend -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+	if [ -n "$$FRONTEND_POD" ]; then \
+		echo "Frontend /healthz: $$(kubectl exec -n bookstore $$FRONTEND_POD -- wget -qO- http://localhost:80/healthz 2>/dev/null || echo 'unavailable')"; \
+	else \
+		echo "❌ No frontend pod found"; \
+	fi
+	@echo ""
+	@echo "✅ Verification complete"
+
 # ================= 清理 =================
 clean: ## 清理部署资源
 	kubectl delete -k $(OVERLAY_DIR)
