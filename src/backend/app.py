@@ -75,8 +75,11 @@ def create_app():
 
     # Apply rate limits to auth endpoints after blueprint registration
     if limiter:
-        limiter.limit("5 per minute")(auth_bp.view_functions['register'])
-        limiter.limit("10 per minute")(auth_bp.view_functions['login'])
+        for endpoint, view_func in app.view_functions.items():
+            if endpoint.endswith('.register') and hasattr(view_func, '__name__') and view_func.__name__ == 'register':
+                limiter.limit("5 per minute")(view_func)
+            if endpoint.endswith('.login') and hasattr(view_func, '__name__') and view_func.__name__ == 'login':
+                limiter.limit("10 per minute")(view_func)
 
     # Before/After request hooks
     @app.before_request

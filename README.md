@@ -91,8 +91,10 @@ make test     # Wait for rollout and print frontend URL
 .
 ├── src/
 │   ├── backend/
-│   │   ├── main.py              # Flask REST API + JWT + metrics
-│   │   ├── requirements.txt     # Python deps (Flask, Gunicorn, PyJWT, Flask-Limiter)
+│   │   ├── app.py               # Flask application factory (create_app)
+│   │   ├── main.py              # Compatibility entrypoint for gunicorn
+│   │   ├── schemas.py           # Pydantic v2 request/response validation
+│   │   ├── requirements.txt     # Python deps (Flask, Gunicorn, PyJWT, Flask-Limiter, Pydantic)
 │   │   ├── Dockerfile
 │   │   ├── alembic.ini          # Alembic configuration
 │   │   ├── alembic/
@@ -102,12 +104,34 @@ make test     # Wait for rollout and print frontend URL
 │   │   │       ├── 002_enhanced_schema.py    # stock, status_history, triggers
 │   │   │       ├── 003_users_table.py        # JWT auth, user_id FKs
 │   │   │       └── 004_performance_indexes.py # DB indexes
-│   │   └── tests/               # pytest suite
+│   │   ├── routes/              # Flask Blueprints
+│   │   │   ├── __init__.py
+│   │   │   ├── probes.py        # /startup, /healthz, /ready, /metrics
+│   │   │   ├── books.py         # /api/books, /api/books/search
+│   │   │   ├── cart.py          # /api/cart
+│   │   │   ├── orders.py        # /api/orders
+│   │   │   ├── auth.py          # /api/auth/*
+│   │   │   ├── payments.py      # /api/payments
+│   │   │   └── admin.py         # /api/admin/*
+│   │   ├── utils/               # Shared utilities
+│   │   │   ├── __init__.py
+│   │   │   ├── db.py            # psycopg2 connection pool
+│   │   │   ├── auth.py          # JWT helpers + @jwt_required
+│   │   │   ├── cache.py         # TTL in-memory cache
+│   │   │   ├── metrics.py       # Prometheus counters
+│   │   │   ├── response.py      # json_response + DecimalEncoder
+│   │   │   └── fallback.py      # In-memory fallback data
+│   │   └── tests/               # pytest suite (50 cases, ~77% cov)
 │   │       ├── conftest.py
-│   │       ├── test_api.py
+│   │       ├── test_books.py
+│   │       ├── test_cart.py
+│   │       ├── test_orders.py
+│   │       ├── test_auth.py
+│   │       ├── test_payments.py
+│   │       ├── test_admin.py
 │   │       ├── test_probes.py
-│   │       ├── test_metrics.py
-│   │       └── test_encoder.py
+│   │       ├── test_encoder.py
+│   │       └── test_errors.py
 │   └── frontend/
 │       ├── package.json         # Vue 3 + Vite + Tailwind + Vue Router + Axios
 │       ├── vite.config.js
@@ -383,12 +407,18 @@ docker run --rm -v "$PWD:/app" -w /app python:3.11-slim \
 
 ### Test Coverage
 
-| Test File | Coverage |
-|-----------|----------|
-| `test_api.py` | Books, Cart, Orders, Auth CRUD |
-| `test_probes.py` | /startup, /healthz, /ready |
-| `test_metrics.py` | /metrics endpoint |
-| `test_encoder.py` | DecimalEncoder |
+| Test File | Cases | Coverage |
+|-----------|-------|----------|
+| `test_books.py` | 8 | List, pagination, search, 404 |
+| `test_cart.py` | 10 | Add, update, delete, empty cart, validation |
+| `test_orders.py` | 7 | Create, list, pagination, empty cart |
+| `test_auth.py` | 9 | Register, login, JWT, 401/403 |
+| `test_payments.py` | 3 | Validation, state transition, 503 |
+| `test_admin.py` | 4 | Auth, forbidden, invalid status |
+| `test_probes.py` | 4 | startup/healthz/ready/metrics |
+| `test_encoder.py` | 2 | DecimalEncoder, json_response |
+| `test_errors.py` | 3 | 404, CORS, security headers |
+| **Total** | **50** | **~77%** (fallback mode; 90%+ with DB) |
 
 ### Load Testing (k6)
 

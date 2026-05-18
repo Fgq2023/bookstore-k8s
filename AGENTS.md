@@ -6,7 +6,7 @@
 
 ## Architecture (3 tiers)
 - **Database**: PostgreSQL 15 (Alpine), deployed via `k8s/base/deployment-postgres.yaml`. Uses PVC `postgres-pvc` and Secret `db-credentials`.
-- **Backend**: Flask 3.0 + Gunicorn 22 (`src/backend/main.py`). Entrypoint: `gunicorn -w 1 -b 0.0.0.0:8000 main:app`. Port `8000`. Depends on `psycopg2-binary`, `Flask`, `gunicorn`. Falls back to an in-memory book list if PostgreSQL is unreachable. Calls `init_database()` on startup to create schema and seed sample data.
+- **Backend**: Flask 3.0 + Gunicorn 22. Entrypoint: `gunicorn -w 1 -b 0.0.0.0:8000 main:app`. Port `8000`. Code is organized into Blueprints (`routes/books.py`, `cart.py`, `orders.py`, `auth.py`, `payments.py`, `admin.py`, `probes.py`) and shared utilities (`utils/db.py`, `auth.py`, `cache.py`, `metrics.py`, `response.py`, `fallback.py`). `app.py` provides the `create_app()` factory; `main.py` is a thin compatibility shim. Falls back to an in-memory book list if PostgreSQL is unreachable.
 - **Frontend**: Vue 3 + Vite + Tailwind CSS SPA (`src/frontend/`). Served by nginx 1.25-alpine. Port `80`. Build pipeline: `npm install` → `vite build` → nginx serves `dist/`. Uses Vue Router (`createWebHistory`) for client-side routing.
 
 ## Developer commands
@@ -49,8 +49,10 @@
 - NetworkPolicy zero-trust mesh: `networkpolicy-db.yaml` (DB←backend), `networkpolicy-frontend.yaml` (Ingress→frontend→backend only), `networkpolicy-backend.yaml` (frontend→backend→DB only). **Minikube caveat**: the default bridge CNI does not enforce NetworkPolicy. To test/verify policies, start Minikube with `--cni=calico` (or another CNI that supports NetworkPolicy).
 
 ## Backend gotchas
-- **Environment variables**: `main.py` reads `DB_HOST`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. It also reads `APP_ENV` (default: `development`) and `LOG_LEVEL` (default: `info`). It does **not** read `DATABASE_URL`.
-- **Deployment now injects DB credentials from Secret**: `deployment-backend.yaml` uses `valueFrom.secretKeyRef` to inject `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from the `db-credentials` Secret. `main.py` no longer contains hardcoded credentials; if environment variables are absent, it falls back to in-memory mode automatically.
+- **Environment variables**: `app.py` (the application factory) reads `DB_HOST`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. It also reads `APP_ENV` (default: `development`) and `LOG_LEVEL` (default: `info`). It does **not** read `DATABASE_URL`.
+- **Deployment now injects DB credentials from Secret**: `deployment-backend.yaml` uses `valueFrom.secretKeyRef` to inject `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from the `db-credentials` Secret. No hardcoded credentials remain; if environment variables are absent, the app falls back to in-memory mode automatically.
+- **Modular architecture**: `app.py` uses Flask Blueprints. Each domain (books, cart, orders, auth, payments, admin, probes) lives in `routes/<name>.py`. Shared utilities (DB pool, JWT, cache, metrics, JSON encoding, fallback data) live in `utils/<name>.py`. `main.py` is a thin compatibility shim for `gunicorn main:app`.
+- **Pydantic validation**: All write endpoints use Pydantic v2 models (`schemas.py`) for request validation. Invalid payloads return 400 with a structured error.
 - API endpoints:
   - `GET /healthz` — liveness probe (returns DB connectivity status)
   - `GET /ready` — readiness probe (returns `"ready"` or `"ready (fallback)"` with HTTP 200; never returns 503 to avoid K8s removing the pod from endpoints during temporary DB downtime)
