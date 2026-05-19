@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import uuid
 import signal
 import logging
 from flask import Flask, request
@@ -85,11 +86,15 @@ def create_app():
     @app.before_request
     def before_request():
         request._start_time = time.time()
+        request.id = request.headers.get('X-Request-ID', str(uuid.uuid4())[:8])
+        logger.info(f"[{request.id}] {request.method} {request.path}")
 
     @app.after_request
     def after_request(response):
         duration = time.time() - getattr(request, '_start_time', time.time())
         record_request(request.method, request.path, response.status_code, duration)
+        # Request tracing
+        response.headers.add('X-Request-ID', getattr(request, 'id', 'unknown'))
         # Security headers
         response.headers.add('X-Content-Type-Options', 'nosniff')
         response.headers.add('X-Frame-Options', 'DENY')

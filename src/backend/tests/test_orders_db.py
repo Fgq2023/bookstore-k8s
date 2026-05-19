@@ -3,6 +3,16 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
+def _mock_transaction_cm(conn):
+    """Helper to mock db_transaction context manager."""
+    class _CM:
+        def __enter__(self):
+            return conn
+        def __exit__(self, *args):
+            return False
+    return _CM()
+
+
 class TestOrdersWithDB:
     def test_list_orders_from_db(self, client):
         conn = MagicMock()
@@ -35,7 +45,7 @@ class TestOrdersWithDB:
             [1, 2, 25.0, 'Book A', 'Author A', 10],  # book_id, qty, price, title, author, stock
         ]
 
-        with patch('routes.orders.get_db_connection', return_value=conn):
+        with patch('routes.orders.db_transaction', return_value=_mock_transaction_cm(conn)):
             resp = client.post('/api/orders', json={
                 'session_id': 'sess_create',
                 'payment_method': 'mock'
@@ -51,7 +61,7 @@ class TestOrdersWithDB:
         conn.cursor.return_value = cur
         cur.fetchone.return_value = None  # no cart
 
-        with patch('routes.orders.get_db_connection', return_value=conn):
+        with patch('routes.orders.db_transaction', return_value=_mock_transaction_cm(conn)):
             resp = client.post('/api/orders', json={
                 'session_id': 'sess_empty',
                 'payment_method': 'mock'
@@ -69,7 +79,7 @@ class TestOrdersWithDB:
             [1, 10, 25.0, 'Book A', 'Author A', 3],  # requested 10, stock 3
         ]
 
-        with patch('routes.orders.get_db_connection', return_value=conn):
+        with patch('routes.orders.db_transaction', return_value=_mock_transaction_cm(conn)):
             resp = client.post('/api/orders', json={
                 'session_id': 'sess_stock',
                 'payment_method': 'mock'

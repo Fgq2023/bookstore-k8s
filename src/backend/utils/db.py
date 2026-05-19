@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import logging
+from contextlib import contextmanager
 
 logger = logging.getLogger('bookstore')
 
@@ -64,6 +65,37 @@ def get_db_connection(max_retries=3, delay=2):
 def put_db_connection(conn):
     if db_pool and conn:
         db_pool.putconn(conn)
+
+
+@contextmanager
+def db_transaction():
+    """Explicit transaction context manager.
+
+    Usage:
+        with db_transaction() as conn:
+            if not conn:
+                return fallback_response
+            cur = conn.cursor()
+            cur.execute(...)
+            # commit on clean exit, rollback on exception
+    """
+    conn = get_db_connection()
+    if not conn:
+        yield None
+        return
+    old_autocommit = conn.autocommit
+    conn.autocommit = False
+    try:
+        yield conn
+        conn.commit()
+        logger.debug("Transaction committed")
+    except Exception:
+        conn.rollback()
+        logger.warning("Transaction rolled back")
+        raise
+    finally:
+        conn.autocommit = old_autocommit
+        put_db_connection(conn)
 
 
 def init_database():

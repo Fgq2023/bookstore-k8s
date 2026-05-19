@@ -1,5 +1,6 @@
 """Cart blueprint."""
 from flask import Blueprint, request
+from pydantic import ValidationError
 from psycopg2.extras import RealDictCursor
 from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection
@@ -50,8 +51,8 @@ def cart():
         body = request.get_json(silent=True) or {}
         try:
             req = CartAddRequest(**body)
-        except Exception as e:
-            return json_response({"error": str(e)}, 400)
+        except ValidationError as e:
+            return json_response({"error": e.errors()}, 400)
 
         conn = get_db_connection()
         if conn:
@@ -88,12 +89,21 @@ def cart_item(item_id):
         body = request.get_json(silent=True) or {}
         try:
             req = CartUpdateRequest(**body)
-        except Exception as e:
-            return json_response({"error": str(e)}, 400)
+        except ValidationError as e:
+            return json_response({"error": e.errors()}, 400)
 
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
+            # Verify ownership via JOIN to prevent IDOR
+            cur.execute("""
+                SELECT ci.id FROM cart_items ci
+                JOIN carts c ON ci.cart_id = c.id
+                WHERE ci.id = %s AND c.session_id = %s
+            """, (item_id, req.session_id))
+            if not cur.fetchone():
+                cur.close(); put_db_connection(conn)
+                return json_response({"error": "item not found or access denied"}, 404)
             if req.quantity == 0:
                 cur.execute("DELETE FROM cart_items WHERE id = %s", (item_id,))
             else:
@@ -118,6 +128,15 @@ def cart_item(item_id):
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
+            # Verify ownership via JOIN to prevent IDOR
+            cur.execute("""
+                SELECT ci.id FROM cart_items ci
+                JOIN carts c ON ci.cart_id = c.id
+                WHERE ci.id = %s AND c.session_id = %s
+            """, (item_id, session_id))
+            if not cur.fetchone():
+                cur.close(); put_db_connection(conn)
+                return json_response({"error": "item not found or access denied"}, 404)
             cur.execute("DELETE FROM cart_items WHERE id = %s", (item_id,))
             cur.close(); put_db_connection(conn)
             return json_response({"status": "deleted", "item_id": item_id})
