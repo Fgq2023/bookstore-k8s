@@ -52,7 +52,8 @@
 - **Environment variables**: `app.py` (the application factory) reads `DB_HOST`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. It also reads `APP_ENV` (default: `development`) and `LOG_LEVEL` (default: `info`). It does **not** read `DATABASE_URL`.
 - **Deployment now injects DB credentials from Secret**: `deployment-backend.yaml` uses `valueFrom.secretKeyRef` to inject `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from the `db-credentials` Secret. No hardcoded credentials remain; if environment variables are absent, the app falls back to in-memory mode automatically.
 - **Modular architecture**: `app.py` uses Flask Blueprints. Each domain (books, cart, orders, auth, payments, admin, probes) lives in `routes/<name>.py`. Shared utilities (DB pool, JWT, cache, metrics, JSON encoding, fallback data) live in `utils/<name>.py`. `main.py` is a thin compatibility shim for `gunicorn main:app`.
-- **Pydantic validation**: All write endpoints use Pydantic v2 models (`schemas.py`) for request validation. Invalid payloads return 400 with a structured error.
+- **Pydantic validation**: All write endpoints use Pydantic v2 models (`schemas.py`) for request validation. Invalid payloads return 400 with a structured error. We use `except ValidationError as e` (not broad `Exception`) to avoid swallowing programming errors.
+- **Explicit transactions**: `utils/db.py` provides `db_transaction()` context manager. `orders.py` POST uses it to wrap the 6-step order creation (orders → order_items → books stock update → cart cleanup) in a single `BEGIN/COMMIT/ROLLBACK`.
 - API endpoints:
   - `GET /healthz` — liveness probe (returns DB connectivity status)
   - `GET /ready` — readiness probe (returns `"ready"` or `"ready (fallback)"` with HTTP 200; never returns 503 to avoid K8s removing the pod from endpoints during temporary DB downtime)
@@ -125,5 +126,12 @@
 - All containers run as non-root with dropped capabilities (`drop: ["ALL"]`).
 - `runAsUser` values: backend `1000`, frontend `101`, postgres `70`.
 - **NetworkPolicy** isolates traffic: frontend only accepts from Ingress Controller and egresses to backend; backend only accepts from frontend and egresses to DB; DB only accepts from backend.
+- **IDOR fix**: `PUT/DELETE /api/cart/item/<id>` verifies ownership via `JOIN carts ON session_id` before allowing modification. Returns 404 with "item not found or access denied" for unauthorized access.
 - **HEALTHCHECK** is present in both backend (`/ready`) and frontend (`/healthz`) Dockerfiles for runtime health monitoring.
 - **Base image patching**: Both Dockerfiles run `apt-get upgrade` (backend) / `apk upgrade` (frontend) during build to patch known system vulnerabilities before deployment.
+
+## Testing conventions
+- **Backend**: 82 tests total — 75 unit (mock DB) + 6 integration (testcontainers real PostgreSQL) + 1 E2E (Playwright API requests).
+- **Frontend**: 30 tests total — 5 BookCard unit + 7 client integration (MSW) + 18 Vue component tests (LoginView, CartView, Navbar).
+- **CI split**: GitHub Actions runs unit tests as required; integration/E2E tests run in a separate job with `continue-on-error` (requires Docker socket, not available in default GitHub Actions runner).
+- **Coverage**: Backend 90% (measured with real DB tests).

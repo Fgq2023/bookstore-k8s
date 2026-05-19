@@ -40,7 +40,9 @@ graph TB
 | **Orchestration** | Kubernetes 1.28+, Kustomize overlays |
 | **Observability** | Prometheus (kube-prometheus-stack), Grafana dashboards |
 | **CI/CD** | GitHub Actions (lint, test, build, security scan) |
-| **Security** | Trivy vulnerability scanner, non-root containers, NetworkPolicy, security headers |
+| **Security** | Trivy vulnerability scanner, non-root containers, NetworkPolicy, security headers, IDOR fix |
+| **Transactions** | Explicit `BEGIN/COMMIT/ROLLBACK` for order creation (ACID guarantee) |
+| **Observability** | Prometheus, Grafana, structured JSON logging, **X-Request-ID** distributed tracing |
 
 ## 🚀 Quick Start
 
@@ -115,14 +117,18 @@ make test     # Wait for rollout and print frontend URL
 │   │   │   └── admin.py         # /api/admin/*
 │   │   ├── utils/               # Shared utilities
 │   │   │   ├── __init__.py
-│   │   │   ├── db.py            # psycopg2 connection pool
+│   │   │   ├── db.py            # psycopg2 connection pool + db_transaction context manager
 │   │   │   ├── auth.py          # JWT helpers + @jwt_required
 │   │   │   ├── cache.py         # TTL in-memory cache
 │   │   │   ├── metrics.py       # Prometheus counters
 │   │   │   ├── response.py      # json_response + DecimalEncoder
 │   │   │   └── fallback.py      # In-memory fallback data
-│   │   └── tests/               # pytest suite (50 cases, ~77% cov)
+│   │   └── tests/               # pytest suite (112 cases, 90% cov)
 │   │       ├── conftest.py
+│   │       ├── e2e/             # Playwright end-to-end tests
+│   │       │   └── test_shopping_flow.py
+│   │       ├── integration/     # testcontainers real-DB tests
+│   │       │   └── test_orders_integration.py
 │   │       ├── test_books.py
 │   │       ├── test_cart.py
 │   │       ├── test_orders.py
@@ -155,7 +161,13 @@ make test     # Wait for rollout and print frontend URL
 │               ├── RegisterView.vue # Sign up
 │               ├── ProfileView.vue  # User profile + orders
 │               ├── AdminView.vue    # Admin metrics dashboard
-│               └── Toast.vue        # Notifications
+│               ├── Toast.vue        # Notifications
+│               └── __tests__/       # Vue component + API tests
+│                   ├── BookCard.spec.js
+│                   ├── CartView.spec.js
+│                   ├── LoginView.spec.js
+│                   ├── Navbar.spec.js
+│                   └── client.integration.spec.js
 ├── k8s/
 │   ├── base/                    # Base manifests
 │   │   ├── deployment-backend.yaml
@@ -183,6 +195,8 @@ make test     # Wait for rollout and print frontend URL
 
 ## 📡 API Reference
 
+> All API responses include `X-Request-ID` header for distributed tracing.
+
 ### Authentication
 
 | Method | Endpoint | Body | Description |
@@ -205,14 +219,14 @@ make test     # Wait for rollout and print frontend URL
 |--------|----------|--------------|-------------|
 | `POST` | `/api/cart` | `{session_id, book_id, quantity}` | Add item to cart |
 | `GET` | `/api/cart` | `?session_id=xxx` | View cart |
-| `PUT` | `/api/cart/item/<id>` | `{session_id, quantity}` | Update quantity (0 = delete) |
-| `DELETE` | `/api/cart/item/<id>` | `?session_id=xxx` | Remove item |
+| `PUT` | `/api/cart/item/<id>` | `{session_id, quantity}` | Update quantity (0 = delete). Ownership verified via JOIN to prevent IDOR |
+| `DELETE` | `/api/cart/item/<id>` | `?session_id=xxx` | Remove item. Ownership verified via JOIN to prevent IDOR |
 
 ### Orders
 
 | Method | Endpoint | Body / Query | Description |
 |--------|----------|--------------|-------------|
-| `POST` | `/api/orders` | `{session_id}` | Place order from cart |
+| `POST` | `/api/orders` | `{session_id}` | Place order from cart (ACID transaction: orders → order_items → books stock → cart cleanup) |
 | `GET` | `/api/orders` | `?session_id=xxx&page=1&per_page=20` | List orders with pagination |
 | `GET` | `/api/orders/<id>` | — | Order details |
 
@@ -327,6 +341,19 @@ initContainers:
 
 ## 📊 Monitoring & Observability
 
+### Request Tracing (X-Request-ID)
+
+Every API request is assigned a unique `X-Request-ID`:
+- Generated in `before_request` if not provided by client
+- Logged with every request/response
+- Returned in response headers for end-to-end correlation
+- Enables tracing a single user action across nginx → Flask → PostgreSQL
+
+```bash
+curl -I http://bookstore.local/api/books
+# X-Request-ID: a1b2c3d4
+```
+
 ### Access Prometheus
 
 ```bash
@@ -361,6 +388,18 @@ make port-forward-grafana
 | `cart_items_added_total` | Counter | Items added to cart |
 
 ## 🔐 Security Features
+
+### IDOR Vulnerability Fix
+
+The cart `PUT/DELETE` endpoints previously allowed any user to modify any cart item by guessing the `item_id`. This was fixed by adding a `JOIN` with the `carts` table to verify the `session_id` matches the item's owner:
+
+```sql
+SELECT ci.id FROM cart_items ci
+JOIN carts c ON ci.cart_id = c.id
+WHERE ci.id = %s AND c.session_id = %s
+```
+
+Unauthorized attempts now return `404 "item not found or access denied"`.
 
 ### JWT Authentication
 
@@ -397,18 +436,18 @@ All API responses include:
 
 ## 🧪 Testing
 
-### Run Tests Locally (Docker)
+### Backend Tests
 
 ```bash
-cd src/backend
-docker run --rm -v "$PWD:/app" -w /app python:3.11-slim \
-  bash -c "pip install -r requirements.txt && pytest tests/ -v --cov=."
+make test-backend              # Unit tests only (mock DB)
+make test-backend-integration  # Integration + E2E tests (requires Docker)
+make test-frontend             # Frontend Vitest
 ```
 
 ### Test Coverage
 
-| Test File | Cases | Coverage |
-|-----------|-------|----------|
+| Test File | Cases | Description |
+|-----------|-------|-------------|
 | `test_books.py` | 8 | List, pagination, search, 404 |
 | `test_cart.py` | 10 | Add, update, delete, empty cart, validation |
 | `test_orders.py` | 7 | Create, list, pagination, empty cart |
@@ -418,7 +457,22 @@ docker run --rm -v "$PWD:/app" -w /app python:3.11-slim \
 | `test_probes.py` | 4 | startup/healthz/ready/metrics |
 | `test_encoder.py` | 2 | DecimalEncoder, json_response |
 | `test_errors.py` | 3 | 404, CORS, security headers |
-| **Total** | **50** | **~77%** (fallback mode; 90%+ with DB) |
+| `test_orders_integration.py` | 6 | **Real PostgreSQL** via testcontainers: stock deduction, insufficient stock, payment transition, status_history, cart cleanup, pagination |
+| `test_shopping_flow.py` | 1 | **Playwright E2E**: register → login → browse → cart → order → pay |
+| **Backend Total** | **82** | **90% coverage** |
+
+### Frontend Tests
+
+| Test File | Cases | Description |
+|-----------|-------|-------------|
+| `BookCard.spec.js` | 5 | Component render, ISBN, price format, add event |
+| `LoginView.spec.js` | 5 | Form render, validation, success, failure, loading state |
+| `CartView.spec.js` | 4 | Empty state, items render, remove, place order |
+| `Navbar.spec.js` | 4 | Auth state, logout, nav links |
+| `client.integration.spec.js` | 7 | MSW-based API: session injection, JWT, 401 interceptor, errors |
+| **Frontend Total** | **30** | |
+
+| **Project Total** | **112** | |
 
 ### Load Testing (k6)
 
@@ -477,6 +531,9 @@ Migrations run automatically via the `db-migrate` initContainer on every pod sta
 | `make deploy` | Apply Kustomize overlay |
 | `make deploy-tag` | One-shot: build → load → update tag → deploy + monitoring |
 | `make test` | Check pod status & wait for rollout |
+| `make test-backend` | Run backend unit tests (mock DB) |
+| `make test-backend-integration` | Run backend integration + E2E tests |
+| `make test-frontend` | Run frontend Vitest |
 | `make status` | Show pods, services, HPA, ingress |
 | `make clean` | Delete all resources |
 | `make scan` | Trivy security scan |
@@ -491,10 +548,12 @@ Override version: `make deploy-tag VERSION=v3.0.3`
 GitHub Actions workflow (`.github/workflows/ci.yml`):
 
 1. **Lint** — Hadolint (Dockerfile), kubeconform (K8s manifests)
-2. **Test** — pytest with coverage report
-3. **Build** — Docker Buildx with GHA cache
-4. **Security Scan** — Trivy SARIF → GitHub Security tab
-5. **Deploy Check** — Kustomize build validation
+2. **Test Backend (Unit)** — pytest with `-m "not integration and not e2e"` and coverage report (required)
+3. **Test Backend (Integration)** — testcontainers + Playwright tests (optional, `continue-on-error`)
+4. **Test Frontend** — Vitest component + API integration tests, then `vite build`
+5. **Build** — Docker Buildx with GHA cache
+6. **Security Scan** — Trivy SARIF → GitHub Security tab
+7. **Deploy Check** — Kustomize build validation
 
 ## 📝 License
 
