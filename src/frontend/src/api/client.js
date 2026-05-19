@@ -76,3 +76,5 @@ export function clearToken() {
 export function isLoggedIn() {
   return !!getToken()
 }
+
+export { client }

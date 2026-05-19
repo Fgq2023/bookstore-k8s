@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 class TestBooksWithDB:
     def test_list_books_from_db(self, client):
+        from utils.cache import _cache
+        _cache.clear()  # avoid cache collision with integration/e2e tests
         conn = MagicMock()
         cur = MagicMock()
         conn.cursor.return_value = cur

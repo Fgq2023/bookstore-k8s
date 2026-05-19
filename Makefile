@@ -51,7 +51,7 @@ deploy-monitoring: ## 部署 Grafana Dashboard 到 monitoring namespace
 deploy-tag: load deploy deploy-monitoring ## 一键构建→加载→更新tag→部署+监控
 	@echo "🚀 Deployment complete with version $(VERSION)"
 
-# ================= 验证 =================
+# ================= 测试 =================
 test: ## 验证集群健康状态
 	@echo "📊 Pod Status"
 	kubectl get pods -l app.kubernetes.io/part-of=bookstore -n bookstore
@@ -61,6 +61,18 @@ test: ## 验证集群健康状态
 	@echo ""
 	@echo "🔗 Frontend URL:"
 	minikube service bookstore-frontend --url -n bookstore || true
+
+test-backend: ## 运行后端单元测试（mock DB）
+	@echo "🧪 Running backend unit tests..."
+	@cd src/backend && pytest tests/ -v -m "not integration and not e2e"
+
+test-backend-integration: ## 运行后端集成测试（真实 PostgreSQL）
+	@echo "🐘 Running backend integration tests with testcontainers..."
+	@cd src/backend && pytest tests/integration/ tests/e2e/ -v
+
+test-frontend: ## 运行前端测试
+	@echo "🎨 Running frontend tests..."
+	@cd src/frontend && npm run test
 
 status: ## 快速查看所有组件状态
 	@echo "=== Pods ==="
