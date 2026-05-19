@@ -1,12 +1,13 @@
 """Books blueprint."""
 import json
 from flask import Blueprint, request
+from pydantic import ValidationError
 from psycopg2.extras import RealDictCursor
 from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection
 from utils.cache import cache_get, cache_set
 from utils.fallback import FALLBACK_BOOKS
-from schemas import BookListQuery
+from schemas import BookListQuery, format_validation_errors
 
 books_bp = Blueprint('books', __name__)
 
@@ -16,8 +17,8 @@ def get_books():
     try:
         q = BookListQuery(page=request.args.get('page', 1, type=int),
                           per_page=request.args.get('per_page', 20, type=int))
-    except Exception as e:
-        return json_response({"error": str(e)}, 400)
+    except ValidationError as e:
+        return json_response({"error": format_validation_errors(e)}, 400)
 
     page = q.page
     per_page = q.per_page

@@ -19,3 +19,11 @@ def cache_set(key, value, ttl_seconds=60):
 
 def cache_delete(key):
     _cache.pop(key, None)
+
+
+def cache_clear_prefix(prefix):
+    """Remove all cache entries whose keys start with the given prefix."""
+    global _cache
+    keys_to_remove = [k for k in _cache if k.startswith(prefix)]
+    for k in keys_to_remove:
+        del _cache[k]

@@ -98,6 +98,34 @@ def db_transaction():
         put_db_connection(conn)
 
 
+@contextmanager
+def db_cursor(cursor_factory=None):
+    """Auto-managed cursor context manager.
+
+    Usage:
+        with db_cursor() as cur:
+            if not cur:
+                return fallback_response
+            cur.execute(...)
+            # cursor closed and connection returned automatically
+    """
+    conn = get_db_connection()
+    if not conn:
+        yield None
+        return
+    cur = None
+    try:
+        if cursor_factory:
+            cur = conn.cursor(cursor_factory=cursor_factory)
+        else:
+            cur = conn.cursor()
+        yield cur
+    finally:
+        if cur:
+            cur.close()
+        put_db_connection(conn)
+
+
 def init_database():
     conn = get_db_connection()
     if not conn:

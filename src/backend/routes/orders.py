@@ -8,8 +8,9 @@ from psycopg2.extras import RealDictCursor
 from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection, db_transaction
 from utils.fallback import _get_or_create_fallback_cart, _book_lookup, _fallback_next_order_id, FALLBACK_ORDERS
+from utils.cache import cache_clear_prefix
 from utils.metrics import METRICS
-from schemas import OrderListQuery
+from schemas import OrderListQuery, format_validation_errors
 
 orders_bp = Blueprint('orders', __name__)
 logger = logging.getLogger('bookstore')
@@ -26,7 +27,7 @@ def orders():
                                page=request.args.get('page', 1, type=int),
                                per_page=request.args.get('per_page', 20, type=int))
         except ValidationError as e:
-            return json_response({"error": e.errors()}, 400)
+            return json_response({"error": format_validation_errors(e)}, 400)
         offset = (q.page - 1) * q.per_page
         conn = get_db_connection()
         if conn:
@@ -54,7 +55,7 @@ def orders():
             from schemas import OrderCreateRequest
             req = OrderCreateRequest(**body)
         except ValidationError as e:
-            return json_response({"error": e.errors()}, 400)
+            return json_response({"error": format_validation_errors(e)}, 400)
 
         with db_transaction() as conn:
             if conn:
@@ -107,6 +108,7 @@ def orders():
                 cur.close()
                 logger.info(f"Order created: id={order_id}, total={total}, items={len(items)}")
                 METRICS['orders_created_total'] += 1
+                cache_clear_prefix("books_list:")
                 return json_response({"status": "created", "order_id": order_id, "total": float(total)}, 201)
             else:
                 # Fallback mode — atomicity guaranteed by single-thread dict ops

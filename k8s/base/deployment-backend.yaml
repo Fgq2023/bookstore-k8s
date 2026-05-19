@@ -21,6 +21,13 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: bookstore-backend
       initContainers:
       - name: db-migrate
         image: bookstore-backend:dev

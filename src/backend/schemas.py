@@ -1,5 +1,27 @@
 """Pydantic request/response validation schemas."""
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, ValidationError
+
+
+def format_validation_errors(exc: ValidationError) -> dict:
+    """Convert Pydantic ValidationError into a user-friendly dict.
+
+    Example output:
+        {"field": "quantity", "message": "must be >= 1"}
+    """
+    errors = exc.errors()
+    if not errors:
+        return {"message": "Validation failed"}
+    first = errors[0]
+    loc = first.get("loc", [])
+    field = loc[-1] if loc else "request"
+    msg = first.get("msg", "Invalid value")
+    # Replace pydantic-isms with friendlier wording
+    msg = msg.replace("Input should be ", "must be ")
+    msg = msg.replace("greater than ", "> ")
+    msg = msg.replace("greater than or equal to ", ">= ")
+    msg = msg.replace("less than ", "< ")
+    msg = msg.replace("less than or equal to ", "<= ")
+    return {"field": field, "message": msg}
 
 
 class RegisterRequest(BaseModel):

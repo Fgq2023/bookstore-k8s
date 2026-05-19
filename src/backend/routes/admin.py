@@ -2,12 +2,13 @@
 import json
 import time
 from flask import Blueprint, request
+from pydantic import ValidationError
 from psycopg2.extras import RealDictCursor
 from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection
 from utils.auth import jwt_required
 from utils.cache import cache_delete
-from schemas import AdminStatusUpdateRequest
+from schemas import AdminStatusUpdateRequest, format_validation_errors
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -21,8 +22,8 @@ def update_order_status(order_id):
     body = request.get_json(silent=True) or {}
     try:
         req = AdminStatusUpdateRequest(**body)
-    except Exception as e:
-        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": str(e)}}, 400)
+    except ValidationError as e:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", **format_validation_errors(e)}}, 400)
 
     conn = get_db_connection()
     if conn:

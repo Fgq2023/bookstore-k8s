@@ -1,11 +1,12 @@
 """Authentication blueprint."""
 import logging
 from flask import Blueprint, request
+from pydantic import ValidationError
 from psycopg2.extras import RealDictCursor
 from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection
 from utils.auth import generate_token, jwt_required
-from schemas import RegisterRequest, LoginRequest
+from schemas import RegisterRequest, LoginRequest, format_validation_errors
 
 auth_bp = Blueprint('auth', __name__)
 logger = logging.getLogger('bookstore')
@@ -21,8 +22,8 @@ def register():
     body = request.get_json(silent=True) or {}
     try:
         req = RegisterRequest(**body)
-    except Exception as e:
-        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": str(e)}}, 400)
+    except ValidationError as e:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", **format_validation_errors(e)}}, 400)
 
     from werkzeug.security import generate_password_hash
     password_hash = generate_password_hash(req.password)
@@ -50,8 +51,8 @@ def login():
     body = request.get_json(silent=True) or {}
     try:
         req = LoginRequest(**body)
-    except Exception as e:
-        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": str(e)}}, 400)
+    except ValidationError as e:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", **format_validation_errors(e)}}, 400)
 
     from werkzeug.security import check_password_hash
     conn = get_db_connection()

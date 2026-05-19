@@ -6,7 +6,7 @@ from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection
 from utils.fallback import _get_or_create_fallback_cart, _book_lookup
 from utils.metrics import METRICS
-from schemas import CartAddRequest, CartUpdateRequest
+from schemas import CartAddRequest, CartUpdateRequest, format_validation_errors
 
 cart_bp = Blueprint('cart', __name__)
 
@@ -52,7 +52,7 @@ def cart():
         try:
             req = CartAddRequest(**body)
         except ValidationError as e:
-            return json_response({"error": e.errors()}, 400)
+            return json_response({"error": format_validation_errors(e)}, 400)
 
         conn = get_db_connection()
         if conn:
@@ -90,7 +90,7 @@ def cart_item(item_id):
         try:
             req = CartUpdateRequest(**body)
         except ValidationError as e:
-            return json_response({"error": e.errors()}, 400)
+            return json_response({"error": format_validation_errors(e)}, 400)
 
         conn = get_db_connection()
         if conn:

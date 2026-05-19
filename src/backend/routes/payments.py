@@ -2,10 +2,11 @@
 import json
 import time
 from flask import Blueprint, request
+from pydantic import ValidationError
 from psycopg2.extras import RealDictCursor
 from utils.response import json_response
 from utils.db import get_db_connection, put_db_connection
-from schemas import PaymentRequest
+from schemas import PaymentRequest, format_validation_errors
 
 payments_bp = Blueprint('payments', __name__)
 
@@ -16,8 +17,8 @@ def create_payment():
     body = request.get_json(silent=True) or {}
     try:
         req = PaymentRequest(**body)
-    except Exception as e:
-        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", "message": str(e)}}, 400)
+    except ValidationError as e:
+        return json_response({"success": False, "error": {"code": "VALIDATION_ERROR", **format_validation_errors(e)}}, 400)
 
     conn = get_db_connection()
     if conn:
