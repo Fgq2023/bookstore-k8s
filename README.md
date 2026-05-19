@@ -54,7 +54,9 @@ graph LR
 | **CI/CD** | GitHub Actions (lint, test, build, security scan) |
 | **Security** | Trivy vulnerability scanner, non-root containers, NetworkPolicy, security headers, IDOR fix |
 | **Transactions** | Explicit `BEGIN/COMMIT/ROLLBACK` for order creation (ACID guarantee) |
+| **Cache** | TTL in-memory cache with **write-through invalidation** (books_list cleared on order) |
 | **Observability** | Prometheus, Grafana, structured JSON logging, **X-Request-ID** distributed tracing |
+| **API Design** | Pydantic v2 validation with user-friendly error messages (no internal jargon leaked) |
 
 ## 🚀 Quick Start
 
@@ -209,6 +211,21 @@ make test     # Wait for rollout and print frontend URL
 
 > All API responses include `X-Request-ID` header for distributed tracing.
 
+### Validation Errors
+
+All write endpoints use **Pydantic v2** for request validation. Invalid payloads return `400` with a **user-friendly** error object (no internal field names or Python types leaked):
+
+```json
+{
+  "error": {
+    "field": "quantity",
+    "message": "must be >= 1"
+  }
+}
+```
+
+We use `except ValidationError as e` (not broad `except Exception`) to avoid accidentally catching programming errors and exposing them to clients.
+
 ### Authentication
 
 | Method | Endpoint | Body | Description |
@@ -320,6 +337,20 @@ Requires `minikube addons enable metrics-server`.
 ### PodDisruptionBudget (PDB)
 
 Ensures at least 1 backend and 1 frontend pod remain available during node drains or upgrades.
+
+### Topology Spread Constraints
+
+Prevents all backend replicas from scheduling on the same node, ensuring availability during node failures:
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: bookstore-backend
+```
 
 ### NetworkPolicy
 
@@ -500,6 +531,37 @@ docker run --rm -i --network=host \
 **Latest Results** (50 VUs, 40s):
 - p(95) latency: **1.76ms**
 - Error rate: < 10%
+
+## ⚡ Performance & Caching
+
+### In-Memory Cache
+
+Book list pages (`/api/books`) are cached for 60 seconds using a TTL in-memory cache:
+- Cache key: `books_list:{page}:{per_page}`
+- Falls back to DB query on cache miss
+
+### Write-Through Cache Invalidation
+
+When an order is placed, the `books_list:*` cache prefix is **immediately cleared** so stock changes are visible in the next listing request:
+
+```python
+# In orders.py POST
+from utils.cache import cache_clear_prefix
+cache_clear_prefix("books_list:")
+```
+
+This eliminates the stale-read problem where a user might see outdated stock quantities after a purchase.
+
+### Pydantic Error Beautification
+
+Invalid API payloads return user-friendly error messages instead of raw Pydantic internals:
+
+| Before (raw Pydantic) | After (beautified) |
+|----------------------|-------------------|
+| `Input should be greater than or equal to 1` | `must be >= 1` |
+| `Input should be a valid string` | `must be a valid string` |
+
+Implementation: `schemas.py` → `format_validation_errors()`
 
 ## 🔄 Database Migrations (Alembic)
 

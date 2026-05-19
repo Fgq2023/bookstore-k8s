@@ -54,6 +54,8 @@
 - **Modular architecture**: `app.py` uses Flask Blueprints. Each domain (books, cart, orders, auth, payments, admin, probes) lives in `routes/<name>.py`. Shared utilities (DB pool, JWT, cache, metrics, JSON encoding, fallback data) live in `utils/<name>.py`. `main.py` is a thin compatibility shim for `gunicorn main:app`.
 - **Pydantic validation**: All write endpoints use Pydantic v2 models (`schemas.py`) for request validation. Invalid payloads return 400 with a structured error. We use `except ValidationError as e` (not broad `Exception`) to avoid swallowing programming errors.
 - **Explicit transactions**: `utils/db.py` provides `db_transaction()` context manager. `orders.py` POST uses it to wrap the 6-step order creation (orders → order_items → books stock update → cart cleanup) in a single `BEGIN/COMMIT/ROLLBACK`.
+- **DB cursor context manager**: `utils/db.py` provides `db_cursor()` for auto-managed cursor lifecycle (open → yield → close → return connection). Prevents connection leaks when routes use early return paths.
+- **Pydantic error beautification**: `schemas.py` provides `format_validation_errors()` that converts Pydantic internal error messages (`Input should be a valid string`) into user-friendly responses (`must be a valid string`). No internal field names or Python types leaked to clients.
 - API endpoints:
   - `GET /healthz` — liveness probe (returns DB connectivity status)
   - `GET /ready` — readiness probe (returns `"ready"` or `"ready (fallback)"` with HTTP 200; never returns 503 to avoid K8s removing the pod from endpoints during temporary DB downtime)
@@ -109,12 +111,15 @@
 - **Graceful Shutdown**: Flask catches `SIGTERM`/`SIGINT`, closes DB pool, exits cleanly. Gunicorn runs with `--graceful-timeout 30 --timeout 120`.
 - **Three-Tier Probes**: `startupProbe` (`/startup`, 60s max), `livenessProbe` (`/healthz`), `readinessProbe` (`/ready`). Startup probe prevents premature liveness failures during Alembic init.
 - **PDB**: `PodDisruptionBudget` ensures min 1 replica available for backend and frontend during node drains.
+- **Topology Spread Constraints**: `deployment-backend.yaml` includes `topologySpreadConstraints` (maxSkew: 1, topologyKey: kubernetes.io/hostname) to prevent all backend replicas from scheduling on the same node.
 - **Multi-replica**: Backend runs 2 replicas by default; HPA scales 2→5 under load.
 
 ### M5 — Performance Optimization
 - **Database Indexes** (Alembic 004): `idx_books_title_author`, `idx_books_isbn`, `idx_orders_session_created`, `idx_cart_items_cart_book`, `idx_order_items_order`.
 - **API Pagination**: `/api/books` and `/api/orders` support `?page=N&per_page=M` (max 100). Returns `{count, total, page, per_page, books/orders}`.
 - **In-Memory Cache**: 60-second TTL cache for book list pages (`cache_get`/`cache_set`). Falls back to DB on cache miss.
+- **Cache Invalidation**: Order creation triggers `cache_clear_prefix("books_list:")` so stock changes are immediately visible in listings (write-through invalidation).
+- **Pydantic Error Beautification**: `format_validation_errors()` converts internal Pydantic jargon (`Input should be a valid string`) into user-friendly messages (`must be a valid string`). No internal field names or Python types leaked to clients.
 - **k6 Load Test**: `scripts/loadtest-v3.js` tests pagination + auth + payment under 50 VUs. p(95) latency < 2ms.
 
 ### M6 — Feature Completeness
