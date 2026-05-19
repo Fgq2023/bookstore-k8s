@@ -7,26 +7,38 @@ A production-ready, cloud-native online bookstore system built with **Flask**, *
 ## 🏗️ System Architecture
 
 ```mermaid
-graph TB
+graph LR
     User((User)) -->|HTTP| Ingress[Ingress Controller<br/>bookstore.local]
-    Ingress -->|/api/*| SVC_FE[Frontend Service<br/>NodePort:30080]
-    SVC_FE -->|/api proxy| SVC_BE[Backend Service<br/>ClusterIP:80]
-    SVC_BE -->|Load Balance| BE1[Backend Pod 1<br/>Flask + Gunicorn]
-    SVC_BE -->|Load Balance| BE2[Backend Pod 2<br/>Flask + Gunicorn]
-    SVC_FE --> FE1[Frontend Pod<br/>Vue 3 + nginx]
-    BE1 -->|psycopg2 pool| DB[(PostgreSQL 15)]
-    BE2 -->|psycopg2 pool| DB
-    BE1 -->|/metrics| Prom[Prometheus]
-    Prom -->|scrape| Grafana[Grafana Dashboard]
-    HPA_BE[HPA Backend<br/>min:2 max:5] -->|scale| BE1
-    HPA_BE -->|scale| BE2
-    HPA_FE[HPA Frontend<br/>min:1 max:3] -->|scale| FE1
-    PDB_BE[PodDisruptionBudget<br/>minAvailable:1] -.-> BE1
-    PDB_BE -.-> BE2
-    PDB_FE[PodDisruptionBudget<br/>minAvailable:1] -.-> FE1
-    NP[NetworkPolicy] -.->|allow only backend| DB
-    Init[Alembic InitContainer<br/>db-migrate] -.->|runs before| BE1
-    Init -.->|runs before| BE2
+    Ingress -->|/| SVC_FE[Frontend Service<br/>NodePort:30080]
+    Ingress -->|/api/*| SVC_BE[Backend Service<br/>ClusterIP:80]
+
+    subgraph Frontend
+        SVC_FE --> FE1[Frontend Pod<br/>Vue 3 + nginx]
+        HPA_FE[HPA<br/>min:1 max:3] -->|scale| FE1
+        PDB_FE[PDB<br/>minAvailable:1] -.-> FE1
+    end
+
+    subgraph Backend
+        SVC_BE --> BE1[Backend Pod 1<br/>Flask + Gunicorn]
+        SVC_BE --> BE2[Backend Pod 2<br/>Flask + Gunicorn]
+        HPA_BE[HPA<br/>min:2 max:5] -->|scale| BE1
+        HPA_BE -->|scale| BE2
+        PDB_BE[PDB<br/>minAvailable:1] -.-> BE1
+        PDB_BE -.-> BE2
+        Init[InitContainer<br/>db-migrate] -.->|runs before| BE1
+        Init -.->|runs before| BE2
+    end
+
+    subgraph Data
+        BE1 -->|psycopg2| DB[(PostgreSQL 15)]
+        BE2 -->|psycopg2| DB
+        NP[NetworkPolicy] -.->|allow backend| DB
+    end
+
+    subgraph Observability
+        BE1 -->|/metrics| Prom[Prometheus]
+        Prom -->|scrape| Grafana[Grafana Dashboard]
+    end
 ```
 
 ## 🛠️ Tech Stack
