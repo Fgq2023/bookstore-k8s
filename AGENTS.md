@@ -49,7 +49,7 @@
 - NetworkPolicy zero-trust mesh: `networkpolicy-db.yaml` (DB←backend), `networkpolicy-frontend.yaml` (Ingress→frontend→backend only), `networkpolicy-backend.yaml` (frontend→backend→DB only). **Minikube caveat**: the default bridge CNI does not enforce NetworkPolicy. To test/verify policies, start Minikube with `--cni=calico` (or another CNI that supports NetworkPolicy).
 
 ## Backend gotchas
-- **Environment variables**: `app.py` (the application factory) reads `DB_HOST`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. It also reads `APP_ENV` (default: `development`) and `LOG_LEVEL` (default: `info`). It does **not** read `DATABASE_URL`.
+- **Environment variables**: `app.py` reads `DB_HOST`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. It also reads `APP_ENV` (default: `development`), `LOG_LEVEL` (default: `info`), and `REDIS_URL` (optional). If `REDIS_URL` is absent or Redis is unreachable, cache and rate limiter gracefully fallback to in-memory backends.
 - **Deployment now injects DB credentials from Secret**: `deployment-backend.yaml` uses `valueFrom.secretKeyRef` to inject `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from the `db-credentials` Secret. No hardcoded credentials remain; if environment variables are absent, the app falls back to in-memory mode automatically.
 - **Modular architecture**: `app.py` uses Flask Blueprints. Each domain (books, cart, orders, auth, payments, admin, probes) lives in `routes/<name>.py`. Shared utilities (DB pool, JWT, cache, metrics, JSON encoding, fallback data) live in `utils/<name>.py`. `main.py` is a thin compatibility shim for `gunicorn main:app`.
 - **Pydantic validation**: All write endpoints use Pydantic v2 models (`schemas.py`) for request validation. Invalid payloads return 400 with a structured error. We use `except ValidationError as e` (not broad `Exception`) to avoid swallowing programming errors.
@@ -101,7 +101,7 @@
 
 ### M3 — Security Hardening
 - **JWT Authentication**: PyJWT-based auth with `/api/auth/register`, `/api/auth/login`, `/api/auth/me`. Passwords hashed with Werkzeug. Token expiry: 24h.
-- **Rate Limiting**: Flask-Limiter (memory backend, single-worker safe). Register: 5/min, Login: 10/min, Default: 200/min.
+- **Rate Limiting**: Flask-Limiter with **Redis backend** (production) and memory fallback (local dev). Register: 5/min, Login: 10/min, Default: 200/min.
 - **Security Headers**: All responses include `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Strict-Transport-Security`, `Referrer-Policy`.
 - **CORS**: Restricted to `localhost:5173`, `localhost:3000`, `bookstore.local` instead of wildcard.
 - **Frontend Auth**: Login/Register/Profile pages, Axios interceptors for JWT injection, route guards (`beforeEach`), global auth state via `localStorage` + custom events.
@@ -117,8 +117,8 @@
 ### M5 — Performance Optimization
 - **Database Indexes** (Alembic 004): `idx_books_title_author`, `idx_books_isbn`, `idx_orders_session_created`, `idx_cart_items_cart_book`, `idx_order_items_order`.
 - **API Pagination**: `/api/books` and `/api/orders` support `?page=N&per_page=M` (max 100). Returns `{count, total, page, per_page, books/orders}`.
-- **In-Memory Cache**: 60-second TTL cache for book list pages (`cache_get`/`cache_set`). Falls back to DB on cache miss.
-- **Cache Invalidation**: Order creation triggers `cache_clear_prefix("books_list:")` so stock changes are immediately visible in listings (write-through invalidation).
+- **Distributed Cache**: Redis-backed TTL cache for book list pages with **memory fallback** when Redis is unavailable. `cache_get`/`cache_set`/`cache_clear_prefix` support both backends transparently.
+- **Cache Invalidation**: Order creation triggers `cache_clear_prefix("books_list:")` so stock changes are immediately visible in listings (write-through invalidation). Uses Redis `SCAN` for safe prefix deletion in production.
 - **Pydantic Error Beautification**: `format_validation_errors()` converts internal Pydantic jargon (`Input should be a valid string`) into user-friendly messages (`must be a valid string`). No internal field names or Python types leaked to clients.
 - **k6 Load Test**: `scripts/loadtest-v3.js` tests pagination + auth + payment under 50 VUs. p(95) latency < 2ms.
 
@@ -126,17 +126,20 @@
 - **Payment Mock**: `POST /api/payments` simulates payment gateway. Transitions order `confirmed` → `shipped` with full `status_history` audit.
 - **Admin Dashboard**: `/admin` route displays raw `/metrics` output (admin-only). Simplified management interface.
 - **User Profile**: `/profile` shows user info + order history with status color badges.
+- **DB Pool Metrics**: `/metrics` exposes `db_pool_used_connections`, `db_pool_free_connections`, and pool utilization ratio for real-time capacity monitoring.
+- **Alertmanager Rules**: 5 Prometheus alerts (P95 latency, error rate, DB connection failures, memory usage, pool exhaustion) deployed via `PrometheusRule` CRD.
+- **Frontend E2E**: Playwright browser automation tests (`e2e/shopping-flow.spec.js`) covering guest browse, user login, and full shopping flow (add to cart → place order → pay).
 
 ## Security conventions
 - All containers run as non-root with dropped capabilities (`drop: ["ALL"]`).
 - `runAsUser` values: backend `1000`, frontend `101`, postgres `70`.
-- **NetworkPolicy** isolates traffic: frontend only accepts from Ingress Controller and egresses to backend; backend only accepts from frontend and egresses to DB; DB only accepts from backend.
+- **NetworkPolicy** isolates traffic: frontend only accepts from Ingress Controller and egresses to backend; backend only accepts from frontend and egresses to DB + Redis; DB only accepts from backend; Redis only accepts from backend.
 - **IDOR fix**: `PUT/DELETE /api/cart/item/<id>` verifies ownership via `JOIN carts ON session_id` before allowing modification. Returns 404 with "item not found or access denied" for unauthorized access.
 - **HEALTHCHECK** is present in both backend (`/ready`) and frontend (`/healthz`) Dockerfiles for runtime health monitoring.
 - **Base image patching**: Both Dockerfiles run `apt-get upgrade` (backend) / `apk upgrade` (frontend) during build to patch known system vulnerabilities before deployment.
 
 ## Testing conventions
 - **Backend**: 82 tests total — 75 unit (mock DB) + 6 integration (testcontainers real PostgreSQL) + 1 E2E (Playwright API requests).
-- **Frontend**: 30 tests total — 5 BookCard unit + 7 client integration (MSW) + 18 Vue component tests (LoginView, CartView, Navbar).
-- **CI split**: GitHub Actions runs unit tests as required; integration/E2E tests run in a separate job with `continue-on-error` (requires Docker socket, not available in default GitHub Actions runner).
+- **Frontend**: 33 tests total — 5 BookCard unit + 7 client integration (MSW) + 18 Vue component tests (LoginView, CartView, Navbar) + 3 Playwright browser E2E (shopping flow).
+- **CI split**: GitHub Actions runs unit tests as required; integration/E2E tests run in separate jobs with `continue-on-error` (requires Docker socket for backend integration, Playwright browsers for frontend E2E).
 - **Coverage**: Backend 90% (measured with real DB tests).

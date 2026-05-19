@@ -70,9 +70,13 @@ test-backend-integration: ## 运行后端集成测试（真实 PostgreSQL）
 	@echo "🐘 Running backend integration tests with testcontainers..."
 	@cd src/backend && pytest tests/integration/ tests/e2e/ -v
 
-test-frontend: ## 运行前端测试
-	@echo "🎨 Running frontend tests..."
+test-frontend: ## 运行前端单元测试
+	@echo "🎨 Running frontend unit tests..."
 	@cd src/frontend && npm run test
+
+test-frontend-e2e: ## 运行前端 Playwright E2E 测试
+	@echo "🎭 Running frontend E2E tests..."
+	@cd src/frontend && npx playwright test
 
 status: ## 快速查看所有组件状态
 	@echo "=== Pods ==="

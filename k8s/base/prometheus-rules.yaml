@@ -1,0 +1,74 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: bookstore-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: bookstore-backend
+      interval: 30s
+      rules:
+        # High P95 latency
+        - alert: BookstoreHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="bookstore-backend"}[5m])) by (le)
+            ) > 2
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Bookstore backend P95 latency is high"
+            description: "P95 latency is above 2 seconds for more than 2 minutes."
+
+        # High error rate (>1% 5xx)
+        - alert: BookstoreHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job="bookstore-backend",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="bookstore-backend"}[5m])) > 0.01
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Bookstore backend error rate is high"
+            description: "5xx error rate is above 1% for more than 1 minute."
+
+        # DB connection failures
+        - alert: BookstoreDBConnectionFailures
+          expr: |
+            increase(db_connections_failed_total{job="bookstore-backend"}[5m]) > 5
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Bookstore DB connection failures detected"
+            description: "More than 5 DB connection failures in the last 5 minutes."
+
+        # Pod memory usage (via kube-state-metrics)
+        - alert: BookstoreHighMemoryUsage
+          expr: |
+            container_memory_working_set_bytes{namespace="bookstore",container="backend"}
+            /
+            container_spec_memory_limit_bytes{namespace="bookstore",container="backend"} > 0.8
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Bookstore backend memory usage is high"
+            description: "Backend memory usage is above 80% for more than 2 minutes."
+
+        # DB pool exhaustion
+        - alert: BookstoreDBPoolExhausted
+          expr: |
+            db_pool_used_connections{job="bookstore-backend"}
+            /
+            (db_pool_used_connections{job="bookstore-backend"} + db_pool_free_connections{job="bookstore-backend"}) > 0.9
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Bookstore DB connection pool nearly exhausted"
+            description: "DB connection pool utilization is above 90%."

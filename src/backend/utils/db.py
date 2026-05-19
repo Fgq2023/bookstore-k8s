@@ -21,6 +21,9 @@ try:
     from psycopg2 import pool
     DB_AVAILABLE = True
 except ImportError:
+    psycopg2 = None  # type: ignore
+    RealDictCursor = None  # type: ignore
+    pool = None  # type: ignore
     DB_AVAILABLE = False
     print("⚠️  psycopg2 not found. Using in-memory fallback mode.", flush=True)
 
@@ -41,6 +44,20 @@ def init_pool():
         db_pool = None
 
 
+def _update_pool_metrics():
+    """Update Prometheus-style metrics with current pool state."""
+    global db_pool
+    if db_pool and hasattr(db_pool, '_used') and hasattr(db_pool, '_pool'):
+        # psycopg2 pool internals: _used is a set of checked-out connections, _pool is a deque of free connections
+        try:
+            used = len(db_pool._used)
+            free = len(db_pool._pool)
+            METRICS['db_pool_used_connections'] = used
+            METRICS['db_pool_free_connections'] = free
+        except Exception:
+            pass
+
+
 def get_db_connection(max_retries=3, delay=2):
     if not DB_AVAILABLE or db_pool is None:
         return None
@@ -52,9 +69,11 @@ def get_db_connection(max_retries=3, delay=2):
                 raise psycopg2.OperationalError("Connection was closed")
             conn.autocommit = True
             METRICS['db_connections_success_total'] += 1
+            _update_pool_metrics()
             return conn
         except psycopg2.OperationalError as e:
             METRICS['db_connections_failed_total'] += 1
+            _update_pool_metrics()
             if attempt == max_retries - 1:
                 logger.error(f"DB connection failed after {max_retries} attempts: {e}")
                 return None
@@ -65,6 +84,7 @@ def get_db_connection(max_retries=3, delay=2):
 def put_db_connection(conn):
     if db_pool and conn:
         db_pool.putconn(conn)
+        _update_pool_metrics()
 
 
 @contextmanager

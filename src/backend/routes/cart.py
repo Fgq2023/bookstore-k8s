@@ -1,9 +1,8 @@
 """Cart blueprint."""
 from flask import Blueprint, request
 from pydantic import ValidationError
-from psycopg2.extras import RealDictCursor
 from utils.response import json_response
-from utils.db import get_db_connection, put_db_connection
+from utils.db import get_db_connection, put_db_connection, RealDictCursor
 from utils.fallback import _get_or_create_fallback_cart, _book_lookup
 from utils.metrics import METRICS
 from schemas import CartAddRequest, CartUpdateRequest, format_validation_errors

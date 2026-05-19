@@ -3,9 +3,8 @@ import json
 import time
 from flask import Blueprint, request
 from pydantic import ValidationError
-from psycopg2.extras import RealDictCursor
 from utils.response import json_response
-from utils.db import get_db_connection, put_db_connection
+from utils.db import get_db_connection, put_db_connection, RealDictCursor
 from utils.auth import jwt_required
 from utils.cache import cache_delete
 from schemas import AdminStatusUpdateRequest, format_validation_errors

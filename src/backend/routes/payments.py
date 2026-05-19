@@ -3,9 +3,8 @@ import json
 import time
 from flask import Blueprint, request
 from pydantic import ValidationError
-from psycopg2.extras import RealDictCursor
 from utils.response import json_response
-from utils.db import get_db_connection, put_db_connection
+from utils.db import get_db_connection, put_db_connection, RealDictCursor
 from schemas import PaymentRequest, format_validation_errors
 
 payments_bp = Blueprint('payments', __name__)

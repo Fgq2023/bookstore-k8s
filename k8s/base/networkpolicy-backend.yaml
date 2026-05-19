@@ -20,7 +20,7 @@ spec:
         - protocol: TCP
           port: 8000
   egress:
-    # Only allow egress to the database (port 5432)
+    # Allow egress to the database (port 5432)
     - to:
         - podSelector:
             matchLabels:
@@ -28,3 +28,11 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # Allow egress to Redis (port 6379)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379

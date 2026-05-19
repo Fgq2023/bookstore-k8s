@@ -2,9 +2,8 @@
 import logging
 from flask import Blueprint, request
 from pydantic import ValidationError
-from psycopg2.extras import RealDictCursor
 from utils.response import json_response
-from utils.db import get_db_connection, put_db_connection
+from utils.db import get_db_connection, put_db_connection, RealDictCursor
 from utils.auth import generate_token, jwt_required
 from schemas import RegisterRequest, LoginRequest, format_validation_errors
 
@@ -13,8 +12,10 @@ logger = logging.getLogger('bookstore')
 
 try:
     import psycopg2
+    IntegrityError = psycopg2.IntegrityError
 except ImportError:
     psycopg2 = None
+    IntegrityError = Exception
 
 
 @auth_bp.route('/api/auth/register', methods=['POST'])
@@ -39,7 +40,7 @@ def register():
             cur.close(); put_db_connection(conn)
             token = generate_token(user_id, req.username)
             return json_response({"success": True, "data": {"user_id": user_id, "username": req.username, "token": token}}, 201)
-        except psycopg2.IntegrityError:
+        except IntegrityError:
             cur.close(); put_db_connection(conn)
             return json_response({"success": False, "error": {"code": "CONFLICT", "message": "Username or email already exists"}}, 409)
     else:

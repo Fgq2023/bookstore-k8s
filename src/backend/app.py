@@ -45,14 +45,27 @@ def create_app():
     try:
         from flask_limiter import Limiter
         from flask_limiter.util import get_remote_address
+
+        # Prefer Redis backend; fallback to memory for single-worker or local dev
+        redis_url = os.getenv('REDIS_URL')
+        if redis_url:
+            storage_uri = redis_url
+            storage_options = {"socket_connect_timeout": 2, "socket_timeout": 2}
+            logger.info("Rate limiter using Redis backend")
+        else:
+            storage_uri = "memory://"
+            storage_options = {}
+            logger.info("Rate limiter using memory backend")
+
         limiter = Limiter(
             key_func=get_remote_address,
             app=app,
             default_limits=["200 per minute", "50 per 10 seconds"],
-            storage_uri="memory://",
+            storage_uri=storage_uri,
+            storage_options=storage_options,
             strategy="fixed-window"
         )
-        logger.info("Rate limiter initialized (memory backend)")
+        logger.info("Rate limiter initialized")
     except ImportError:
         limiter = None
         logger.warning("Flask-Limiter not installed, rate limiting disabled")

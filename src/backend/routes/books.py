@@ -2,9 +2,8 @@
 import json
 from flask import Blueprint, request
 from pydantic import ValidationError
-from psycopg2.extras import RealDictCursor
 from utils.response import json_response
-from utils.db import get_db_connection, put_db_connection
+from utils.db import get_db_connection, put_db_connection, RealDictCursor
 from utils.cache import cache_get, cache_set
 from utils.fallback import FALLBACK_BOOKS
 from schemas import BookListQuery, format_validation_errors

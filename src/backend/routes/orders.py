@@ -4,9 +4,8 @@ import time
 import logging
 from flask import Blueprint, request
 from pydantic import ValidationError
-from psycopg2.extras import RealDictCursor
 from utils.response import json_response
-from utils.db import get_db_connection, put_db_connection, db_transaction
+from utils.db import get_db_connection, put_db_connection, db_transaction, RealDictCursor
 from utils.fallback import _get_or_create_fallback_cart, _book_lookup, _fallback_next_order_id, FALLBACK_ORDERS
 from utils.cache import cache_clear_prefix
 from utils.metrics import METRICS

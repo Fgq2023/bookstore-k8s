@@ -1,12 +1,13 @@
 """End-to-end shopping flow test using Playwright API requests against a live server."""
 
 import pytest
-from playwright.sync_api import sync_playwright
 
 
 @pytest.mark.e2e
 def test_full_shopping_flow(live_server):
     """Complete user journey: register -> login -> browse -> cart -> order -> pay -> verify."""
+    from playwright.sync_api import sync_playwright
+
     with sync_playwright() as p:
         request = p.request.new_context(base_url=live_server)
 

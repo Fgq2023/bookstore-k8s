@@ -13,6 +13,9 @@ resources:
   - networkpolicy-db.yaml
   - networkpolicy-frontend.yaml
   - networkpolicy-backend.yaml
+  - networkpolicy-redis.yaml
+  - deployment-redis.yaml
+  - service-redis.yaml
   - service-backend.yaml
   - service-frontend.yaml
   - deployment-backend.yaml
@@ -20,6 +23,9 @@ resources:
   - ingress.yaml
   - hpa.yaml
   - pdb.yaml
+  - servicemonitor.yaml
+  - grafana-dashboard.yaml
+  - prometheus-rules.yaml
 
 labels:
   - pairs:

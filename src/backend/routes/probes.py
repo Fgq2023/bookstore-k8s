@@ -27,6 +27,12 @@ def metrics():
     lines.append("# HELP db_connections_failed_total Failed DB connections")
     lines.append("# TYPE db_connections_failed_total counter")
     lines.append(f"db_connections_failed_total {METRICS['db_connections_failed_total']}")
+    lines.append("# HELP db_pool_used_connections Currently used DB connections")
+    lines.append("# TYPE db_pool_used_connections gauge")
+    lines.append(f"db_pool_used_connections {METRICS['db_pool_used_connections']}")
+    lines.append("# HELP db_pool_free_connections Currently free DB connections")
+    lines.append("# TYPE db_pool_free_connections gauge")
+    lines.append(f"db_pool_free_connections {METRICS['db_pool_free_connections']}")
     lines.append("# HELP orders_created_total Orders created")
     lines.append("# TYPE orders_created_total counter")
     lines.append(f"orders_created_total {METRICS['orders_created_total']}")
@@ -39,12 +45,12 @@ def metrics():
 
 @probes_bp.route('/startup', methods=['GET'])
 def startup():
-    if not DB_AVAILABLE:
-        return json_response({"status": "ok", "db": "unavailable"}, 200)
     conn = get_db_connection()
     if conn:
         put_db_connection(conn)
         return json_response({"status": "ok", "db": "connected"}, 200)
+    if not DB_AVAILABLE:
+        return json_response({"status": "ok", "db": "unavailable"}, 200)
     return json_response({"status": "ok", "db": "fallback"}, 200)
 
 

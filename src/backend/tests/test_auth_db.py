@@ -24,11 +24,10 @@ class TestAuthWithDB:
         assert 'token' in data['data']
 
     def test_register_duplicate_username(self, client):
-        import psycopg2
         conn = MagicMock()
         cur = MagicMock()
         conn.cursor.return_value = cur
-        cur.execute.side_effect = psycopg2.IntegrityError('duplicate key')
+        cur.execute.side_effect = Exception('duplicate key')
 
         with patch('routes.auth.get_db_connection', return_value=conn):
             resp = client.post('/api/auth/register', json={

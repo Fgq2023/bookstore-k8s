@@ -64,6 +64,31 @@ data:
           ],
           "title": "Business Metrics",
           "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "showPoints": "never"}, "unit": "conn"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "id": 5,
+          "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+          "targets": [
+            {"expr": "db_pool_used_connections{job=\"bookstore-backend\"}", "legendFormat": "used", "refId": "A"},
+            {"expr": "db_pool_free_connections{job=\"bookstore-backend\"}", "legendFormat": "free", "refId": "B"}
+          ],
+          "title": "DB Connection Pool",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "showPoints": "never"}, "unit": "percentunit"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "id": 6,
+          "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+          "targets": [
+            {"expr": "db_pool_used_connections{job=\"bookstore-backend\"} / (db_pool_used_connections{job=\"bookstore-backend\"} + db_pool_free_connections{job=\"bookstore-backend\"})", "legendFormat": "utilization", "refId": "A"}
+          ],
+          "title": "DB Pool Utilization",
+          "type": "timeseries"
         }
       ],
       "refresh": "5s",
@@ -76,6 +101,6 @@ data:
       "timezone": "",
       "title": "Cloud-Native Bookstore",
       "uid": "bookstore-dashboard",
-      "version": 1,
+      "version": 2,
       "weekStart": ""
     }

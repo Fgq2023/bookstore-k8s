@@ -54,9 +54,10 @@ graph LR
 | **CI/CD** | GitHub Actions (lint, test, build, security scan) |
 | **Security** | Trivy vulnerability scanner, non-root containers, NetworkPolicy, security headers, IDOR fix |
 | **Transactions** | Explicit `BEGIN/COMMIT/ROLLBACK` for order creation (ACID guarantee) |
-| **Cache** | TTL in-memory cache with **write-through invalidation** (books_list cleared on order) |
-| **Observability** | Prometheus, Grafana, structured JSON logging, **X-Request-ID** distributed tracing |
+| **Cache** | **Redis** distributed cache with memory fallback; write-through invalidation on order creation |
+| **Observability** | Prometheus, Grafana, **Alertmanager**, structured JSON logging, **X-Request-ID** distributed tracing |
 | **API Design** | Pydantic v2 validation with user-friendly error messages (no internal jargon leaked) |
+| **DB Monitoring** | Real-time connection pool metrics (used/free/utilization) exposed on `/metrics` |
 
 ## 🚀 Quick Start
 
@@ -356,8 +357,9 @@ topologySpreadConstraints:
 
 Zero-trust network mesh:
 - `frontend-netpol`: Ingress → frontend only
-- `backend-netpol`: frontend → backend only
+- `backend-netpol`: frontend → backend + Redis only
 - `postgres-allow-backend-only`: backend → DB only
+- `redis-netpol`: backend → Redis only
 
 ### InitContainer: Database Migrations
 
@@ -414,10 +416,23 @@ make port-forward-grafana
 
 ### Dashboards
 
-- **Cloud-Native Bookstore** (auto-provisioned)
+- **Cloud-Native Bookstore** (auto-provisioned, 6 panels)
   - HTTP Request Rate & Duration
   - DB Connection Success/Failed
+  - **DB Connection Pool** (used / free / utilization %)
   - Orders Created & Cart Items Added
+
+### Alertmanager Rules
+
+PrometheusRule CRD defines 5 critical alerts:
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| `BookstoreHighLatency` | P95 > 2s for 2m | warning |
+| `BookstoreHighErrorRate` | 5xx rate > 1% for 1m | critical |
+| `BookstoreDBConnectionFailures` | > 5 failed connections in 5m | warning |
+| `BookstoreHighMemoryUsage` | Memory > 80% for 2m | warning |
+| `BookstoreDBPoolExhausted` | Pool utilization > 90% for 1m | critical |
 
 ### Prometheus Metrics
 
@@ -484,7 +499,8 @@ All API responses include:
 ```bash
 make test-backend              # Unit tests only (mock DB)
 make test-backend-integration  # Integration + E2E tests (requires Docker)
-make test-frontend             # Frontend Vitest
+make test-frontend             # Frontend Vitest unit tests
+make test-frontend-e2e         # Frontend Playwright browser E2E tests
 ```
 
 ### Test Coverage
@@ -513,9 +529,10 @@ make test-frontend             # Frontend Vitest
 | `CartView.spec.js` | 4 | Empty state, items render, remove, place order |
 | `Navbar.spec.js` | 4 | Auth state, logout, nav links |
 | `client.integration.spec.js` | 7 | MSW-based API: session injection, JWT, 401 interceptor, errors |
-| **Frontend Total** | **30** | |
+| `shopping-flow.spec.js` | 3 | **Playwright E2E**: browse → login → cart → order (browser automation) |
+| **Frontend Total** | **33** | |
 
-| **Project Total** | **112** | |
+| **Project Total** | **115** | |
 
 ### Load Testing (k6)
 
@@ -607,7 +624,8 @@ Migrations run automatically via the `db-migrate` initContainer on every pod sta
 | `make test` | Check pod status & wait for rollout |
 | `make test-backend` | Run backend unit tests (mock DB) |
 | `make test-backend-integration` | Run backend integration + E2E tests |
-| `make test-frontend` | Run frontend Vitest |
+| `make test-frontend` | Run frontend Vitest unit tests |
+| `make test-frontend-e2e` | Run frontend Playwright browser E2E tests |
 | `make status` | Show pods, services, HPA, ingress |
 | `make clean` | Delete all resources |
 | `make scan` | Trivy security scan |
@@ -623,11 +641,12 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 
 1. **Lint** — Hadolint (Dockerfile), kubeconform (K8s manifests)
 2. **Test Backend (Unit)** — pytest with `-m "not integration and not e2e"` and coverage report (required)
-3. **Test Backend (Integration)** — testcontainers + Playwright tests (optional, `continue-on-error`)
-4. **Test Frontend** — Vitest component + API integration tests, then `vite build`
-5. **Build** — Docker Buildx with GHA cache
-6. **Security Scan** — Trivy SARIF → GitHub Security tab
-7. **Deploy Check** — Kustomize build validation
+3. **Test Backend (Integration)** — testcontainers + Playwright API tests (optional, `continue-on-error`)
+4. **Test Frontend (Unit)** — Vitest component + API integration tests, then `vite build`
+5. **Test Frontend (E2E)** — Playwright browser automation tests (Chromium, optional)
+6. **Build** — Docker Buildx with GHA cache
+7. **Security Scan** — Trivy SARIF → GitHub Security tab
+8. **Deploy Check** — Kustomize build validation
 
 ## 📝 License
 
