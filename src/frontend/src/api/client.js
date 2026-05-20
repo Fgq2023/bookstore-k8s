@@ -77,4 +77,15 @@ export function isLoggedIn() {
   return !!getToken()
 }
 
+export function isAdmin() {
+  const token = getToken()
+  if (!token) return false
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return !!payload.is_admin
+  } catch {
+    return false
+  }
+}
+
 export { client }

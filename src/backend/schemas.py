@@ -58,6 +58,22 @@ class AdminStatusUpdateRequest(BaseModel):
     status: str = Field(..., pattern=r'^(pending|confirmed|shipped|delivered|cancelled)$')
 
 
+class BookCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    author: str = Field(..., min_length=1, max_length=255)
+    isbn: str = Field(..., min_length=10, max_length=20)
+    price: float = Field(..., gt=0)
+    stock_quantity: int = Field(default=0, ge=0)
+
+
+class BookUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    author: str | None = Field(default=None, min_length=1, max_length=255)
+    isbn: str | None = Field(default=None, min_length=10, max_length=20)
+    price: float | None = Field(default=None, gt=0)
+    stock_quantity: int | None = Field(default=None, ge=0)
+
+
 class BookListQuery(BaseModel):
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=20, ge=1, le=100)
