@@ -644,6 +644,91 @@ Migrations run automatically via the `db-migrate` initContainer on every pod sta
 
 Override version: `make deploy-tag VERSION=v3.0.3`
 
+## 🐛 Troubleshooting
+
+### `make clean` fails with "NotFound" errors
+
+**Symptom:**
+```
+Error from server (NotFound): configmaps "bookstore-grafana-dashboard" not found
+make: *** [Makefile:117: clean] Error 1
+```
+
+**Fix:** Already fixed in latest Makefile. `kubectl delete` now uses `--ignore-not-found=true` so partial or inconsistent cluster states don't block cleanup.
+
+### Backend pod stuck in `CrashLoopBackOff`
+
+**Symptom:** `kubectl get pods` shows backend restarting repeatedly.
+
+**Diagnose:**
+```bash
+kubectl logs -n bookstore deployment/bookstore-backend --previous | tail -30
+```
+
+**Common causes:**
+- **Logging config error** (`python-json-logger` KeyError) — Fixed in `app.py`. Remove `rename_fields` from `JsonFormatter` if you encounter this.
+- **Database connection failure** — Check postgres pod is running and Secret `db-credentials` exists.
+- **Missing environment variables** — Backend falls back to in-memory mode automatically, but verify `DB_HOST`, `POSTGRES_DB`, etc.
+
+### Redis pod `ImagePullBackOff`
+
+**Symptom:**
+```
+Failed to pull image "redis:7-alpine": context deadline exceeded
+```
+
+**Fix:** Minikube's internal Docker daemon cannot always reach Docker Hub. Pre-pull and load the image manually:
+
+```bash
+docker pull redis:7-alpine
+minikube image load redis:7-alpine
+kubectl rollout restart deployment/redis -n bookstore
+```
+
+### `kustomize build` security error for monitoring
+
+**Symptom:**
+```
+accumulation err='accumulating resources from '../base/grafana-dashboard.yaml': security; file is not in or below ...'
+```
+
+**Fix:** Kustomize v3+ disallows path traversal outside the build directory. Copy referenced files locally:
+
+```bash
+cp k8s/base/grafana-dashboard.yaml k8s/monitoring/
+cp k8s/base/servicemonitor.yaml k8s/monitoring/
+```
+
+Then update `k8s/monitoring/kustomization.yaml` to reference local copies.
+
+### Cannot access app from Windows browser
+
+**Symptom:** `http://127.0.0.1:XXXXX` works in WSL2 but not in Windows.
+
+**Why:** `127.0.0.1` in WSL2 is isolated from Windows host.
+
+**Solutions:**
+
+| Method | URL | Steps |
+|--------|-----|-------|
+| **NodePort (Recommended)** | `http://$(minikube ip):30080` | Get Minikube IP: `minikube ip` |
+| **minikube service** | Auto-detected | `minikube service bookstore-frontend -n bookstore` |
+| **Ingress + hosts** | `http://bookstore.local` | Add `$(minikube ip) bookstore.local` to Windows `C:\Windows\System32\drivers\etc\hosts` |
+| **kubectl port-forward** | `http://localhost:8080` | `kubectl port-forward -n bookstore svc/bookstore-frontend 8080:80` |
+
+### Deployment timeout waiting for rollout
+
+**Symptom:** `make deploy-tag` hangs on `kubectl wait`.
+
+**Fix:** Check pod status first:
+
+```bash
+kubectl get pods -n bookstore
+kubectl describe pod -n bookstore <pod-name>
+```
+
+If backend is stuck in `Init:0/1`, the `db-migrate` initContainer is waiting for PostgreSQL. Ensure postgres pod is `Running`.
+
 ## 🔄 CI/CD Pipeline
 
 GitHub Actions workflow (`.github/workflows/ci.yml`):
