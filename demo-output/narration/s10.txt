@@ -1,1 +1,1 @@
-Under the hood, everything runs on Kubernetes. We have four core services: frontend, backend, PostgreSQL, and Redis, each isolated by NetworkPolicy for zero-trust security.
+Order placement is wrapped in an ACID transaction: create order, atomically deduct stock, clear the cart, and invalidate the Redis cache, all succeed or all rollback. The payment mock transitions orders through a state machine with full JSONB audit trails. Write-through cache invalidation ensures all users see updated inventory immediately.

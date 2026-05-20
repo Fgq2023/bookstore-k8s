@@ -1,1 +1,1 @@
-Redis serves as our distributed cache. Book listings are cached for 60 seconds. On a cache hit, response time drops from milliseconds to microseconds. If Redis fails, the system gracefully falls back to in-memory caching.
+Kubernetes provides self-healing capabilities. If we manually delete a backend pod, the Deployment controller immediately creates a replacement. The new pod goes through initialization, runs database migrations, and passes health checks before receiving traffic.

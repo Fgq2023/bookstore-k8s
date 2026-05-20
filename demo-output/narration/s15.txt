@@ -1,1 +1,1 @@
-Every pull request triggers an eight-stage CI pipeline: linting, unit tests, integration tests, frontend E2E with Playwright, Docker builds, Trivy security scans, and Kubernetes manifest validation.
+Observability is built into every layer. Prometheus scrapes metrics every 15 seconds. The Grafana dashboard shows real-time HTTP rates, latency percentiles, database connection pool utilization, and business metrics like orders and cart operations. Alertmanager watches for five critical conditions including high latency, error rates, and pool exhaustion.

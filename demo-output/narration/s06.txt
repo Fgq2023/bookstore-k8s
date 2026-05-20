@@ -1,1 +1,1 @@
-Each book shows detailed information including ISBN and real-time stock. Adding to cart triggers an API call with session isolation. The cart count updates reactively across the entire application.
+The bookstore homepage presents the complete catalog with real-time stock quantities. Each book card displays the title, author, ISBN, price, and current availability.

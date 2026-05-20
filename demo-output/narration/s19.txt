@@ -1,0 +1,1 @@
+Every pull request triggers an eight-stage CI pipeline. Required jobs include unit tests and build, while integration and browser tests run optionally so external dependencies don't block the pipeline. Security scanning with Trivy uploads vulnerability reports to GitHub Security tab.

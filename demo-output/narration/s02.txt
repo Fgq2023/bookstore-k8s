@@ -1,1 +1,1 @@
-Traditional web applications struggle with scaling, deployment complexity, and lack of observability. How do we build a modern, production-ready e-commerce system?
+This is our cloud-native online bookstore, a production-ready e-commerce system built on Kubernetes. We demonstrate modern cloud engineering practices: microservices architecture, automated scaling, comprehensive observability, and enterprise-grade security.

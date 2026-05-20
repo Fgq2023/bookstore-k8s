@@ -1,1 +1,1 @@
-Our payment mock simulates a gateway, transitioning orders from confirmed to shipped. Stock is atomically deducted, and the cache is invalidated so all users see updated inventory immediately.
+The cart supports quantity adjustments with real-time total calculation. Every cart operation is protected against IDOR attacks through JOIN-based ownership verification. Users can only modify their own cart items.

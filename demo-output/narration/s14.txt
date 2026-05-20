@@ -1,1 +1,1 @@
-Security is layered: JWT authentication, Redis-backed rate limiting, zero-trust NetworkPolicies, and non-root containers with dropped capabilities.
+Our application gracefully handles database failures. When PostgreSQL becomes unreachable, the backend automatically switches to in-memory fallback mode, serving cached book data without crashing. When the database recovers, connections are re-established seamlessly.

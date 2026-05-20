@@ -1,1 +1,0 @@
-Welcome to our bookstore. Users can browse the complete catalog with real-time stock information. The frontend is a Vue 3 single-page application, served by nginx.

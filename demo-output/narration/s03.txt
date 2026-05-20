@@ -1,1 +1,1 @@
-Our answer: a cloud-native online bookstore. Containerized, orchestrated by Kubernetes, with full observability, auto-scaling, and enterprise-grade security.
+Our system follows a classic three-tier architecture. At the edge, an Ingress Controller routes traffic. The frontend is a Vue 3 single-page application served by nginx. The backend API runs Flask with Gunicorn. Data is persisted in PostgreSQL with Alembic migrations. Redis provides distributed caching. And the entire stack is observable through Prometheus metrics and Grafana dashboards.

@@ -1,0 +1,1 @@
+Security is layered throughout the stack. All responses include security headers. Rate limiting protects authentication endpoints. Zero-trust NetworkPolicies restrict traffic flow. And containers run as non-root with dropped capabilities.

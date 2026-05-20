@@ -1,1 +1,1 @@
-The shopping cart supports quantity updates and item removal with instant total calculation. Every cart operation is protected against IDOR attacks — users can only modify their own cart items.
+Search queries by title or author with instant filtering. The backend API supports pagination with configurable page sizes, returning total counts and metadata.

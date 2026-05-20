@@ -1,0 +1,1 @@
+Backend test coverage is measured at 90 percent. Every endpoint has both happy-path and error-case tests. The coverage report shows detailed per-module breakdowns, ensuring critical paths are thoroughly validated.

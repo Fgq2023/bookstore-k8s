@@ -1,432 +1,451 @@
 # Cloud-Native Bookstore Demo Video Script
-
-**Project:** DSAA4040 Engineering Track | Group 5  
-**Title:** Cloud-Native Online Bookstore on Kubernetes  
-**Target Duration:** 3 minutes 30 seconds  
-**Resolution:** 1920x1080 (16:9)  
-**Style:** Professional, clean, tech-forward with smooth transitions
+# DSAA4040 Engineering Track | Group 5
+# Target Duration: 7-9 minutes | Resolution: 1920x1080
 
 ---
 
 ## Video Structure Overview
 
-| Act | Scene | Duration | Focus |
-|-----|-------|----------|-------|
-| 1. Hook | S01-S03 | 20s | Problem + Solution introduction |
-| 2. Features | S04-S09 | 90s | Core user journey (browse → pay) |
-| 3. Tech Deep-Dive | S10-S14 | 60s | K8s, HPA, Monitoring, Cache |
-| 4. Quality | S15-S16 | 30s | CI/CD + Testing |
-| 5. Closing | S17 | 20s | Summary + Group info |
+| Act | Scenes | Duration | Content |
+|-----|--------|----------|---------|
+| 1. Introduction | S01-S02 | 30s | Title + Project Overview |
+| 2. Architecture | S03-S04 | 75s | Three-tier design + Data flow |
+| 3. Deployment | S05 | 60s | One-command deployment |
+| 4. Core Features | S06-S10 | 120s | Browse → Search → Cart → Order → Pay |
+| 5. Auto-scaling | S11-S12 | 70s | HPA trigger + Scale back |
+| 6. Resilience | S13-S14 | 55s | Pod failure + Auto-recovery |
+| 7. Observability | S15 | 45s | Grafana + Prometheus + Alerts |
+| 8. Performance | S16 | 35s | Redis cache latency comparison |
+| 9. Quality | S17-S18 | 60s | Test pyramid + Coverage |
+| 10. CI/CD | S19 | 30s | GitHub Actions pipeline |
+| 11. Security | S20 | 25s | Defense in depth |
+| 12. Closing | S21 | 20s | Summary + Credits |
 
-**Total: ~220 seconds (3m 40s)**
-
----
-
-## Scene-by-Scene Script
-
-### ACT 1: HOOK (0:00 - 0:20)
-
----
-
-#### **S01 — Opening Title Card**
-- **Duration:** 5s
-- **Visual:**
-  - Dark gradient background (#1a1a2e → #16213e)
-  - Animated Kubernetes logo (subtle rotation)
-  - Title text fades in: **"Cloud-Native Online Bookstore"**
-  - Subtitle: **"Built on Kubernetes | DSAA4040 Group 5"**
-  - Bottom: Date "May 2026"
-- **Narration:** *[No narration — let music breathe]*
-- **Audio:** Upbeat, modern tech intro music (synthwave/corporate)
-- **Transition:** Fade to next scene
+**Total: ~625 seconds (10m 25s)** → Edit down to 7-9 minutes
 
 ---
 
-#### **S02 — The Problem**
-- **Duration:** 7s
-- **Visual:**
-  - Split screen or montage:
-    - Left: Cluttered monolithic app diagram (messy arrows)
-    - Right: Text bullet points fading in:
-      - "❌ Scaling issues"
-      - "❌ Manual deployments"
-      - "❌ No observability"
-      - "❌ Security vulnerabilities"
-  - Color: Red/orange accents for "problem" feel
-- **Narration:**
-  > "Traditional web applications struggle with scaling, deployment complexity, and lack of observability. How do we build a modern, production-ready e-commerce system?"
-- **Transition:** Quick cut/zoom to solution
+## ACT 1: INTRODUCTION (0:00 - 0:30)
 
 ---
 
-#### **S03 — The Solution**
-- **Duration:** 8s
-- **Visual:**
-  - Clean architecture diagram (the one from README)
-  - Components highlight sequentially:
-    1. Ingress glows
-    2. Frontend (Vue + nginx) glows
-    3. Backend (Flask + Gunicorn) glows
-    4. PostgreSQL, Redis, Prometheus glows
-  - Center text: **"Cloud-Native Architecture on Kubernetes"**
-  - Color: Blue/cyan accents for "solution" feel
-- **Narration:**
-  > "Our answer: a cloud-native online bookstore. Containerized, orchestrated by Kubernetes, with full observability, auto-scaling, and enterprise-grade security."
-- **Transition:** Fade to browser window
-
----
-
-### ACT 2: CORE FEATURES (0:20 - 1:50)
-
----
-
-#### **S04 — Landing Page & Browse**
-- **Duration:** 15s
-- **Visual:**
-  - Screen recording: Browser at `http://bookstore.local`
-  - Clean bookstore homepage loads
-  - Show book grid: "Clean Code", "Design Patterns", etc.
-  - Cursor movement (smooth, not jerky)
-  - Highlight: Book cards with cover, title, author, price, stock
-- **Narration:**
-  > "Welcome to our bookstore. Users can browse the complete catalog with real-time stock information. The frontend is a Vue 3 single-page application, served by nginx."
-- **On-screen text:** "Vue 3 + Vite + Tailwind CSS"
-- **Transition:** Smooth scroll or cut
-
----
-
-#### **S05 — Search Feature**
-- **Duration:** 12s
-- **Visual:**
-  - Cursor clicks search box
-  - Types: "Clean" (with typing effect or speed-up)
-  - Results filter in real-time: only "Clean Code" remains
-  - Clear search, show "Design Patterns" returns
-  - Show empty state: type "XYZ" → "No books found"
-- **Narration:**
-  > "The search feature queries by title or author instantly, with backend API pagination and Redis caching for sub-millisecond response times."
-- **On-screen text:** "Redis Cache + PostgreSQL Indexes"
-- **Transition:** Cut to book detail
-
----
-
-#### **S06 — Book Detail & Add to Cart**
-- **Duration:** 15s
-- **Visual:**
-  - Click on "Clean Code" book card
-  - Detail page: ISBN, price $42.99, stock 10
-  - Click "Add to Cart" button
-  - Toast notification: "Added to cart!" (top-right)
-  - Cart badge in navbar updates: 0 → 1
-  - Add another copy (quantity: 2)
-- **Narration:**
-  > "Each book shows detailed information including ISBN and real-time stock. Adding to cart triggers an API call with session isolation. The cart count updates reactively across the entire application."
-- **On-screen text:** "Session Isolation + Reactive State"
-- **Transition:** Click cart icon
-
----
-
-#### **S07 — Shopping Cart**
-- **Duration:** 15s
-- **Visual:**
-  - Cart page loads
-  - Show item: Clean Code, 2x, $85.98 total
-  - Demonstrate quantity update: click + to 3 → total updates
-  - Show "Remove" button hover/click → item removed → empty state
-  - Re-add item for continuity
-- **Narration:**
-  > "The shopping cart supports quantity updates and item removal with instant total calculation. Every cart operation is protected against IDOR attacks — users can only modify their own cart items."
-- **On-screen text:** "IDOR Protection via JOIN Verification"
-- **Transition:** Click "Place Order"
-
----
-
-#### **S08 — Order Placement (ACID Transaction)**
-- **Duration:** 18s
-- **Visual:**
-  - "Place Order" button click
-  - Loading spinner (1s)
-  - Redirect to Orders page
-  - New order appears: Order #501, Status: "Confirmed"
-  - Click order to show details
-  - Show status_history JSONB in admin view (optional terminal split)
-- **Narration:**
-  > "Order placement is wrapped in an ACID database transaction: create order, deduct stock, clear cart, and invalidate the Redis cache — all succeed or all rollback. The order state machine tracks every transition in a JSONB audit trail."
-- **On-screen text:** "ACID Transaction + State Machine"
-- **Transition:** Cut to payment
-
----
-
-#### **S09 — Payment & Order Completion**
-- **Duration:** 15s
-- **Visual:**
-  - Click "Pay Now" on order
-  - Mock payment modal/overlay
-  - "Processing..." → "Payment Successful!"
-  - Order status updates: Confirmed → Shipped
-  - Return to book list: stock decreased from 10 to 8
-- **Narration:**
-  > "Our payment mock simulates a gateway, transitioning orders from confirmed to shipped. Stock is atomically deducted, and the cache is invalidated so all users see updated inventory immediately."
-- **On-screen text:** "Write-Through Cache Invalidation"
-- **Transition:** Fade to terminal/K8s view
-
----
-
-### ACT 3: TECHNICAL DEEP-DIVE (1:50 - 2:50)
-
----
-
-#### **S10 — Kubernetes Architecture**
-- **Duration:** 12s
-- **Visual:**
-  - Terminal window: `kubectl get pods -n bookstore`
-  - Show running pods:
-    - `bookstore-frontend-xxx` (Running)
-    - `bookstore-backend-xxx` (2 replicas)
-    - `postgres-xxx` (Running)
-    - `redis-xxx` (Running)
-  - Switch to: `kubectl get svc -n bookstore`
-  - Show Services: frontend (NodePort), backend (ClusterIP), postgres, redis
-- **Narration:**
-  > "Under the hood, everything runs on Kubernetes. We have four core services: frontend, backend, PostgreSQL, and Redis, each isolated by NetworkPolicy for zero-trust security."
-- **On-screen text:** "Kustomize + NetworkPolicy"
-- **Transition:** Split screen
-
----
-
-#### **S11 — Horizontal Pod Autoscaler (HPA)**
-- **Duration:** 15s
-- **Visual:**
-  - Left: `kubectl get hpa -n bookstore` (shows target/current CPU)
-  - Right: `watch kubectl get pods -n bookstore` (real-time)
-  - Run k6 load test (terminal): `make load-test`
-  - Watch backend pods scale: 2 → 3 → 4 → 5 replicas
-  - Show HPA events: `kubectl describe hpa bookstore-backend -n bookstore`
-- **Narration:**
-  > "When traffic spikes, the Horizontal Pod Autoscaler scales the backend from two to five replicas based on CPU utilization. We verified this with k6 load testing at 150 virtual users."
-- **On-screen text:** "HPA: 2→5 Replicas | CPU Target: 70%"
-- **Transition:** Cut to Grafana
-
----
-
-#### **S12 — Monitoring & Alerting**
-- **Duration:** 20s
-- **Visual:**
-  - Browser: Grafana dashboard at `localhost:3000`
-  - Show 6-panel dashboard:
-    1. HTTP Request Rate (graph)
-    2. Request Duration P95 (graph)
-    3. DB Connection Success/Failed (counters)
-    4. **DB Pool Used/Free connections** (gauge)
-    5. Orders Created (counter)
-    6. Cart Items Added (counter)
-  - Switch to Prometheus: `http_requests_total` query
-  - Show Alertmanager rules YAML (code view):
-    - HighLatency, HighErrorRate, DBPoolExhausted...
-- **Narration:**
-  > "Observability is built-in. Prometheus scrapes metrics every 15 seconds. Grafana dashboards show real-time performance, including database connection pool utilization. Alertmanager watches for five critical conditions — from high latency to pool exhaustion."
-- **On-screen text:** "Prometheus + Grafana + Alertmanager"
-- **Transition:** Terminal view
-
----
-
-#### **S13 — Redis Cache in Action**
-- **Duration:** 12s
-- **Visual:**
-  - Terminal: `kubectl exec -it redis-xxx -- redis-cli monitor`
-  - Show GET/SET commands flowing
-  - Split screen: 
-    - Left: `curl http://bookstore.local/api/books` (1st call — slow)
-    - Right: Same curl again (2nd call — instant, from cache)
-  - Show cache key: `books_list:1:20`
-- **Narration:**
-  > "Redis serves as our distributed cache. Book listings are cached for 60 seconds. On a cache hit, response time drops from milliseconds to microseconds. If Redis fails, the system gracefully falls back to in-memory caching."
-- **On-screen text:** "Redis Primary → Memory Fallback"
-- **Transition:** Cut to code/CI
-
----
-
-#### **S14 — Security Features**
+### S01 — Opening Title Card
 - **Duration:** 10s
-- **Visual:**
-  - Quick montage of security features:
-    - `curl -I` showing security headers (X-Content-Type-Options, HSTS)
-    - JWT token in Network tab (browser DevTools)
-    - Rate limit test: `curl` loop hitting 429 Too Many Requests
-    - `kubectl describe networkpolicy` output
-  - Badge icons: 🔒 JWT, 🛡️ Rate Limit, 🔥 NetworkPolicy
+- **Visual:** Animated title with Kubernetes logo, project name, group info
+- **Narration:** [No narration, just background music]
+- **File:** `scenes/s01-title.html`
+
+---
+
+### S02 — Project Overview
+- **Duration:** 20s
+- **Visual:** Split screen - problem statement left, solution architecture right
 - **Narration:**
-  > "Security is layered: JWT authentication, Redis-backed rate limiting, zero-trust NetworkPolicies, and non-root containers with dropped capabilities."
-- **On-screen text:** "Defense in Depth"
-- **Transition:** Fade to GitHub
+  > "This is our cloud-native online bookstore, a production-ready e-commerce system built on Kubernetes. We demonstrate modern cloud engineering practices: microservices architecture, automated scaling, comprehensive observability, and enterprise-grade security."
+- **File:** Screen recording of app homepage
 
 ---
 
-### ACT 4: QUALITY & CI/CD (2:50 - 3:20)
+## ACT 2: ARCHITECTURE & DATA FLOW (0:30 - 1:45)
 
 ---
 
-#### **S15 — CI/CD Pipeline**
-- **Duration:** 15s
-- **Visual:**
-  - GitHub Actions page showing green workflow run
-  - Stages highlight sequentially (scroll or animation):
-    1. ✅ Lint (Hadolint + kubeconform)
-    2. ✅ Test Backend Unit (75 tests)
-    3. ✅ Test Frontend Unit (25 tests)
-    4. ✅ Build (Docker Buildx)
-    5. ✅ Security Scan (Trivy)
-    6. ✅ Deploy Check (Kustomize)
-  - Final badge: **"All checks passed"**
+### S03 — Three-Tier Architecture
+- **Duration:** 40s
+- **Visual:** Architecture diagram with components highlighting sequentially
+  1. Ingress Controller glows
+  2. Frontend (Vue + nginx) glows
+  3. Backend (Flask + Gunicorn) glows
+  4. PostgreSQL glows
+  5. Redis glows
+  6. Prometheus + Grafana glows
 - **Narration:**
-  > "Every pull request triggers an eight-stage CI pipeline: linting, unit tests, integration tests, frontend E2E with Playwright, Docker builds, Trivy security scans, and Kubernetes manifest validation."
-- **On-screen text:** "GitHub Actions | 115 Tests | 90% Coverage"
-- **Transition:** Cut to test output
+  > "Our system follows a classic three-tier architecture. At the edge, an Ingress Controller routes traffic. The frontend is a Vue 3 single-page application served by nginx. The backend API runs Flask with Gunicorn. Data is persisted in PostgreSQL with Alembic migrations. Redis provides distributed caching. And the entire stack is observable through Prometheus metrics and Grafana dashboards."
+- **File:** `scenes/s03-solution.html`
 
 ---
 
-#### **S16 — Testing Pyramid**
-- **Duration:** 15s
-- **Visual:**
-  - Pyramid diagram:
-    - Top (small): 3 Playwright E2E tests (browser)
-    - Middle: 6 Integration tests (testcontainers)
-    - Bottom (large): 75 Unit tests (pytest)
-  - Show terminal: `pytest tests/ -v` output scrolling
-  - Coverage report: 90% in green
-  - Frontend tests: `vitest run` + `playwright test` output
+### S04 — Request Data Flow
+- **Duration:** 35s
+- **Visual:** Animated flow diagram showing a user request lifecycle
+  1. User → Ingress (highlight path)
+  2. Ingress → Frontend Service → Frontend Pod
+  3. Frontend Pod → Backend Service → Backend Pod
+  4. Backend checks Redis cache (hit/miss animation)
+  5. Cache miss → PostgreSQL query
+  6. Response flows back with X-Request-ID header
+  7. Prometheus scrapes /metrics endpoint
 - **Narration:**
-  > "Our testing strategy follows the pyramid: 75 fast unit tests, 6 integration tests with real PostgreSQL via testcontainers, and 3 Playwright browser tests covering the complete user journey."
-- **On-screen text:** "115 Tests | 90% Backend Coverage"
-- **Transition:** Fade to closing
+  > "When a user sends a request, it enters through the Ingress Controller. The frontend nginx serves the Vue SPA or proxies API calls to the backend. The backend first checks Redis cache. On a hit, it returns in microseconds. On a miss, it queries PostgreSQL and populates the cache. Every response carries an X-Request-ID for distributed tracing, while Prometheus continuously scrapes performance metrics."
+- **File:** New HTML animation or terminal recording
 
 ---
 
-### ACT 5: CLOSING (3:20 - 3:40)
+## ACT 3: ONE-COMMAND DEPLOYMENT (1:45 - 2:45)
 
 ---
 
-#### **S17 — Closing Card**
+### S05 — Deployment Walkthrough
+- **Duration:** 60s
+- **Visual:** Terminal screen recording showing:
+  ```bash
+  $ minikube start --driver=docker --cpus=2 --memory=4096
+  $ minikube addons enable ingress metrics-server
+  $ make deploy-tag VERSION=demo
+  ```
+  - Show docker build output (backend + frontend)
+  - Show `minikube image load` progress
+  - Show `kubectl apply` creating resources
+  - Show pods starting up: `kubectl get pods -w -n bookstore`
+  - Show `kubectl wait` for readiness
+  - Show `make status` output
+  - Show `make test` verifying health checks
+- **Narration:**
+  > "Deployment is fully automated. A single command, make deploy-tag, orchestrates the entire workflow. It builds Docker images, loads them into Minikube, updates Kustomize image tags, and deploys all Kubernetes resources. Here we see the backend and frontend containers building, images being transferred, and pods initializing with health probes. The initContainer runs database migrations before the application starts. Within two minutes, all services are running and health checks pass."
+- **Overlay text:**
+  - "Docker Build"
+  - "Image Load"
+  - "Kustomize Apply"
+  - "Health Checks"
+
+---
+
+## ACT 4: CORE FEATURES (2:45 - 4:45)
+
+---
+
+### S06 — Browse Book Catalog
+- **Duration:** 25s
+- **Visual:** Browser at `http://localhost:8080`
+  - Homepage loads with book grid
+  - Show 6 books with cover, title, author, price, stock
+  - Cursor hovers over book card showing hover effect
+- **Narration:**
+  > "The bookstore homepage presents the complete catalog with real-time stock quantities. Each book card displays the title, author, ISBN, price, and current availability."
+
+---
+
+### S07 — Search with Pagination
 - **Duration:** 20s
 - **Visual:**
-  - Return to architecture diagram (S03), but all components glowing green
-  - Summary text fades in:
-    - "✅ Cloud-Native on Kubernetes"
-    - "✅ Auto-scaling & Self-healing"
-    - "✅ Full Observability"
-    - "✅ Enterprise Security"
-    - "✅ 115 Automated Tests"
-  - Final screen:
-    - **"Cloud-Native Bookstore"**
-    - **"DSAA4040 | Group 5"**
-    - Date: May 2026
-    - GitHub repo URL (if public)
+  - Type "Clean" in search box
+  - Results filter instantly
+  - Show "No results" for "XYZ"
+  - Clear search, show pagination controls at bottom
+  - Click page 2
 - **Narration:**
-  > "This is our cloud-native bookstore — built for scale, observed in real-time, secured by design, and validated by comprehensive testing. Thank you for watching."
-- **Audio:** Music swells, fades out
-- **Final frame:** Hold 5 seconds with group member names (optional)
+  > "Search queries by title or author with instant filtering. The backend API supports pagination with configurable page sizes, returning total counts and metadata."
 
 ---
 
-## Technical Notes
+### S08 — Book Detail & Cart
+- **Duration:** 25s
+- **Visual:**
+  - Click on "Clean Code"
+  - Detail page: ISBN, price $42.99, stock 10
+  - Click "Add to Cart" → Toast notification
+  - Cart badge updates: 0 → 1
+  - Click "Add to Cart" again → quantity: 2
+  - Click Cart icon
+- **Narration:**
+  > "The detail view shows complete book metadata. Adding to cart triggers a POST request with session isolation. The reactive cart counter updates globally across the application."
 
-### Recording Tools Recommended
+---
 
-| Task | Tool | Notes |
-|------|------|-------|
-| Screen Recording | OBS Studio or QuickTime | 1920x1080, 30fps |
-| Terminal Recording | asciinema + svg-term | Or direct terminal capture |
-| Browser Automation | Playwright | For consistent, repeatable UI shots |
-| Video Editing | DaVinci Resolve (free) or CapCut | Add transitions, text overlays |
-| Audio Narration | Audacity + USB mic | Or Mac built-in mic with noise removal |
-| Background Music | Pixabay Music or Uppbeat.io | Corporate/tech genre, instrumental |
+### S09 — Shopping Cart Operations
+- **Duration:** 25s
+- **Visual:**
+  - Cart page shows "Clean Code", quantity 2, total $85.98
+  - Click + to increase to 3 → total updates
+  - Click - to decrease to 1 → total updates
+  - Click Remove → empty state with "Your cart is empty"
+  - Re-add book
+- **Narration:**
+  > "The cart supports quantity adjustments with real-time total calculation. Every cart operation is protected against IDOR attacks through JOIN-based ownership verification. Users can only modify their own cart items."
 
-### Key Recording Tips
+---
 
-1. **Browser Windows**: Use Chrome with minimal bookmarks, hide bookmarks bar, maximize window to 1920x1080
-2. **Terminal**: Use dark theme (Dracula or Monokai), increase font size (14-16pt), show only relevant output
-3. **Cursor**: Make cursor visible and larger (macOS: Accessibility → Pointer size)
-4. **Timing**: Pause 1-2 seconds after each action before cutting — gives viewers time to process
-5. **Text Overlays**: Use consistent font (Inter or Roboto), white text with dark semi-transparent background
-6. **Zoom**: Use smooth zoom for important details (OBS plugin or post-production)
+### S10 — Order Placement & Payment
+- **Duration:** 25s
+- **Visual:**
+  - Click "Place Order"
+  - Loading spinner
+  - Redirect to Orders page
+  - New order: #501, status "Confirmed"
+  - Click "Pay Now"
+  - "Processing..." → "Payment Successful"
+  - Status changes: Confirmed → Shipped
+  - Navigate back to homepage, stock decreased from 10 to 8
+- **Narration:**
+  > "Order placement is wrapped in an ACID transaction: create order, atomically deduct stock, clear the cart, and invalidate the Redis cache — all succeed or all rollback. The payment mock transitions orders through a state machine with full JSONB audit trails. Write-through cache invalidation ensures all users see updated inventory immediately."
 
-### Pre-Recording Checklist
+---
 
-- [ ] Minikube cluster is running (`minikube status`)
-- [ ] All pods are Ready (`kubectl get pods -n bookstore`)
-- [ ] Application is accessible (`curl http://bookstore.local/api/healthz`)
-- [ ] Grafana is accessible (if showing dashboards)
-- [ ] Terminal windows are sized and themed
-- [ ] Browser cache is cleared (for clean first-load shots)
-- [ ] Book data is seeded (run demo script if needed)
-- [ ] k6 load test script is ready (for HPA scene)
-- [ ] Recording software tested (audio levels, resolution)
+## ACT 5: AUTO-SCALING (4:45 - 5:55)
 
-### One-Take Setup Script
+---
+
+### S11 — HPA Trigger: Scale Up
+- **Duration:** 40s
+- **Visual:** Terminal recording
+  ```bash
+  $ kubectl get hpa -n bookstore
+  $ watch kubectl get pods -n bookstore
+  # In another terminal:
+  $ make load-test
+  ```
+  - Watch backend replicas: 2 → 3 → 4 → 5
+  - HPA shows CPU rising above 70% target
+  - kubectl describe hpa shows scaling events
+- **Narration:**
+  > "Horizontal Pod Autoscaler monitors CPU utilization every 15 seconds. When load increases, it automatically scales the backend from two to five replicas. Here we run a k6 load test with 150 virtual users. Watch the replica count increase as CPU crosses the 70 percent threshold."
+- **Overlay:** "k6 Load Test: 150 VUs"
+
+---
+
+### S12 — HPA Recovery: Scale Down
+- **Duration:** 30s
+- **Visual:** Terminal recording
+  - Stop load test
+  - Watch pods scale back: 5 → 4 → 3 → 2
+  - Show HPA events: "New size: 2; reason: All metrics below target"
+- **Narration:**
+  > "When load subsides, HPA gracefully scales back down to the minimum replica count. This elastic scaling ensures efficient resource utilization — we only pay for what we need, when we need it."
+
+---
+
+## ACT 6: RESILIENCE & SELF-HEALING (5:55 - 6:50)
+
+---
+
+### S13 — Simulating Pod Failure
+- **Duration:** 25s
+- **Visual:** Terminal recording
+  ```bash
+  $ kubectl get pods -n bookstore
+  $ kubectl delete pod -n bookstore -l app=bookstore-backend
+  $ kubectl get pods -n bookstore -w
+  ```
+  - Show pod terminating
+  - Show new pod created by Deployment
+  - Watch new pod progress: Pending → ContainerCreating → Running
+- **Narration:**
+  > "Kubernetes provides self-healing capabilities. If we manually delete a backend pod, the Deployment controller immediately creates a replacement. The new pod goes through initialization, runs database migrations, and passes health checks before receiving traffic."
+
+---
+
+### S14 — Database Disconnection Recovery
+- **Duration:** 30s
+- **Visual:** Terminal recording
+  ```bash
+  $ kubectl scale deployment bookstore-db -n bookstore --replicas=0
+  $ curl http://localhost:8080/api/healthz
+  # Show fallback mode response
+  $ kubectl scale deployment bookstore-db -n bookstore --replicas=1
+  $ curl http://localhost:8080/api/healthz
+  # Show recovery
+  ```
+- **Narration:**
+  > "Our application gracefully handles database failures. When PostgreSQL becomes unreachable, the backend automatically switches to in-memory fallback mode, serving cached book data without crashing. When the database recovers, connections are re-established seamlessly."
+
+---
+
+## ACT 7: OBSERVABILITY (6:50 - 7:35)
+
+---
+
+### S15 — Monitoring Dashboard
+- **Duration:** 45s
+- **Visual:** Grafana dashboard (real or `scenes/s12-monitoring.html`)
+  - Show 6 panels:
+    1. HTTP Request Rate graph
+    2. P95 Latency graph
+    3. DB Connection Success/Failed counters
+    4. DB Pool Used/Free gauge
+    5. Orders Created counter
+    6. Cart Items Added counter
+  - Switch to Prometheus: query `http_requests_total`
+  - Show Alertmanager rules: `kubectl get prometheusrules -n monitoring`
+- **Narration:**
+  > "Observability is built into every layer. Prometheus scrapes metrics every 15 seconds. The Grafana dashboard shows real-time HTTP rates, latency percentiles, database connection pool utilization, and business metrics like orders and cart operations. Alertmanager watches for five critical conditions including high latency, error rates, and pool exhaustion."
+
+---
+
+## ACT 8: PERFORMANCE (7:35 - 8:10)
+
+---
+
+### S16 — Redis Cache Latency Comparison
+- **Duration:** 35s
+- **Visual:** Terminal recording
+  ```bash
+  # Cold cache (first request)
+  $ time curl -s http://localhost:8080/api/books > /dev/null
+  real    0m0.045s
+
+  # Warm cache (second request)
+  $ time curl -s http://localhost:8080/api/books > /dev/null
+  real    0m0.003s
+
+  # Redis monitor
+  $ kubectl exec -it redis-xxx -- redis-cli monitor
+  GET books_list:1:20
+  ```
+- **Narration:**
+  > "Redis provides dramatic performance improvements. The first request takes 45 milliseconds as it queries PostgreSQL. Subsequent requests hit the Redis cache and return in 3 milliseconds — a 15x speedup. If Redis fails, the system gracefully falls back to in-memory caching."
+- **Overlay:** "Cache Miss: 45ms → Cache Hit: 3ms (15x faster)"
+
+---
+
+## ACT 9: TESTING & QUALITY (8:10 - 9:10)
+
+---
+
+### S17 — Test Pyramid Execution
+- **Duration:** 30s
+- **Visual:** Terminal recording
+  ```bash
+  $ make test-backend
+  # pytest output scrolling: 75 tests passing
+  $ make test-frontend
+  # vitest output: 25 tests passing
+  $ make test-frontend-e2e
+  # playwright output: 3 tests passing
+  ```
+- **Narration:**
+  > "Quality is ensured through a comprehensive testing pyramid: 75 fast unit tests with mocked dependencies, 6 integration tests using real PostgreSQL via testcontainers, and 3 Playwright browser tests covering the complete user journey from login to payment."
+
+---
+
+### S18 — Coverage Report
+- **Duration:** 30s
+- **Visual:** Terminal recording
+  ```bash
+  $ cd src/backend && pytest tests/ --cov=. --cov-report=html
+  $ ls htmlcov/
+  $ python3 -m http.server 8888 --directory htmlcov/
+  # Browser: localhost:8888
+  ```
+  - Show coverage report: 90% overall
+  - Click through routes/ (88%), utils/ (92%), schemas.py (95%)
+- **Narration:**
+  > "Backend test coverage is measured at 90 percent. Every endpoint has both happy-path and error-case tests. The coverage report shows detailed per-module breakdowns, ensuring critical paths are thoroughly validated."
+
+---
+
+## ACT 10: CI/CD PIPELINE (9:10 - 9:40)
+
+---
+
+### S19 — GitHub Actions Workflow
+- **Duration:** 30s
+- **Visual:** Browser showing GitHub Actions
+  - Show workflow diagram with 8 stages
+  - Click into each stage:
+    1. Lint: Hadolint + kubeconform (green)
+    2. Backend Unit Tests: pytest 75 tests (green)
+    3. Backend Integration: testcontainers (green, continue-on-error)
+    4. Frontend Unit: Vitest 25 tests + build (green)
+    5. Frontend E2E: Playwright 3 tests (green, continue-on-error)
+    6. Build: Docker Buildx (green)
+    7. Security Scan: Trivy SARIF (green)
+    8. Deploy Check: Kustomize validate (green)
+- **Narration:**
+  > "Every pull request triggers an eight-stage CI pipeline. Required jobs include unit tests and build, while integration and browser tests run optionally so external dependencies don't block the pipeline. Security scanning with Trivy uploads vulnerability reports to GitHub Security tab."
+
+---
+
+## ACT 11: SECURITY (9:40 - 10:05)
+
+---
+
+### S20 — Defense in Depth
+- **Duration:** 25s
+- **Visual:** Terminal + Browser montage
+  ```bash
+  # Security headers
+  $ curl -I http://localhost:8080/api/books
+  # Show: X-Content-Type-Options, X-Frame-Options, HSTS
+
+  # Rate limiting
+  $ for i in {1..6}; do curl -s http://localhost:8080/api/auth/register; done
+  # Show 429 Too Many Requests
+
+  # Network policy
+  $ kubectl describe networkpolicy -n bookstore
+  ```
+- **Narration:**
+  > "Security is layered throughout the stack. All responses include security headers. Rate limiting protects authentication endpoints. Zero-trust NetworkPolicies restrict traffic flow. And containers run as non-root with dropped capabilities."
+
+---
+
+## ACT 12: CLOSING (10:05 - 10:25)
+
+---
+
+### S21 — Summary & Credits
+- **Duration:** 20s
+- **Visual:** `scenes/s17-closing.html` with animated achievements
+  - "Cloud-Native on Kubernetes"
+  - "Auto-scaling & Self-healing"
+  - "Full Observability"
+  - "Enterprise Security"
+  - "115 Automated Tests"
+- **Narration:**
+  > "This is our cloud-native bookstore — built for scale, observed in real-time, resilient to failures, secured by design, and validated by comprehensive testing. Thank you for watching."
+
+---
+
+## Production Notes
+
+### Recording Checklist
+
+Before recording:
+- [ ] Minikube running with all addons enabled
+- [ ] All pods Ready (`kubectl get pods -n bookstore`)
+- [ ] Frontend accessible via port-forward or Ingress
+- [ ] Grafana accessible (`make port-forward-grafana`)
+- [ ] Terminal: Dracula theme, 14pt font, 1920x1080
+- [ ] Browser: Chrome maximized, bookmarks hidden
+- [ ] Cursor size increased for visibility
+- [ ] `scripts/loadtest.js` ready for HPA demo
+- [ ] k6 Docker image available
+
+### Recommended Tools
+
+| Task | Tool |
+|------|------|
+| Screen Recording | OBS Studio (free) |
+| Terminal Recording | asciinema or direct terminal capture |
+| Browser Automation | Playwright (for consistent screenshots) |
+| Video Editing | DaVinci Resolve (free) or CapCut |
+| Audio | Audacity + USB mic |
+| Music | Pixabay Music (royalty-free) |
+
+### One-Take Setup
 
 ```bash
 # Start fresh
-make clean
-make deploy-tag VERSION=demo
+cd /mnt/d/Class/DSAA4040/bookstore-k8s
 
-# Wait for all pods
-kubectl wait --for=condition=ready pod -l app=bookstore-backend -n bookstore --timeout=120s
-kubectl wait --for=condition=ready pod -l app=bookstore-frontend -n bookstore --timeout=120s
+# Verify cluster
+minikube status
+kubectl get pods -n bookstore
 
-# Seed data (if needed)
-# curl -X POST http://bookstore.local/api/admin/seed
+# Start port-forwards (run in separate terminals)
+kubectl port-forward -n bookstore svc/bookstore-frontend 8080:80
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 80:80
+make port-forward-grafana &
 
 # Verify endpoints
-curl -s http://bookstore.local/api/books | head -c 200
-curl -s http://bookstore.local/api/healthz
+curl http://localhost:8080/api/healthz
+curl http://bookstore.local/api/books  # if using Ingress
 
-# Start port-forwards for Grafana (in separate terminal)
-make port-forward-grafana &
-make port-forward-prometheus &
+# Ready to record!
 ```
 
 ---
 
-## Alternative: Automated Video Generation
-
-If you want to generate this video programmatically, use the `demo-output/` directory:
-
-```bash
-# 1. Generate scene screenshots with Playwright
-python3 demo-output/build.sh
-
-# 2. Record narration (or use edge-tts)
-# 3. Composite with ffmpeg
-```
-
-See `demo-output/scenes/` for HTML scene templates and `demo-output/build.sh` for the full pipeline.
-
----
-
-## Narration Audio File Map
-
-| Scene | File | Duration | Text |
-|-------|------|----------|------|
-| S02 | `narration/s02.txt` | 7s | "Traditional web applications struggle..." |
-| S03 | `narration/s03.txt` | 8s | "Our answer: a cloud-native online bookstore..." |
-| S04 | `narration/s04.txt` | 15s | "Welcome to our bookstore..." |
-| S05 | `narration/s05.txt` | 12s | "The search feature queries by title..." |
-| S06 | `narration/s06.txt` | 15s | "Each book shows detailed information..." |
-| S07 | `narration/s07.txt` | 15s | "The shopping cart supports quantity updates..." |
-| S08 | `narration/s08.txt` | 18s | "Order placement is wrapped in an ACID..." |
-| S09 | `narration/s09.txt` | 15s | "Our payment mock simulates a gateway..." |
-| S10 | `narration/s10.txt` | 12s | "Under the hood, everything runs on Kubernetes..." |
-| S11 | `narration/s11.txt` | 15s | "When traffic spikes, the Horizontal Pod Autoscaler..." |
-| S12 | `narration/s12.txt` | 20s | "Observability is built-in. Prometheus scrapes..." |
-| S13 | `narration/s13.txt` | 12s | "Redis serves as our distributed cache..." |
-| S14 | `narration/s14.txt` | 10s | "Security is layered: JWT authentication..." |
-| S15 | `narration/s15.txt` | 15s | "Every pull request triggers an eight-stage..." |
-| S16 | `narration/s16.txt` | 15s | "Our testing strategy follows the pyramid..." |
-| S17 | `narration/s17.txt` | 20s | "This is our cloud-native bookstore..." |
-
-**Total narration time: ~234 seconds (~4 minutes)**  
-*Note: Adjust pacing in editing to match visual timing (target 3:30 total)*
-
----
-
-*Script generated on May 20, 2026*
+*Script updated on May 20, 2026*
+*Target duration: 7-9 minutes*
+*Recommended output: 1080p30, MP4 H.264*

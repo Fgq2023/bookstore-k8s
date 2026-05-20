@@ -1,1 +1,1 @@
-This is our cloud-native bookstore — built for scale, observed in real-time, secured by design, and validated by comprehensive testing. Thank you for watching.
+Quality is ensured through a comprehensive testing pyramid: 75 fast unit tests with mocked dependencies, 6 integration tests using real PostgreSQL via testcontainers, and 3 Playwright browser tests covering the complete user journey from login to payment.

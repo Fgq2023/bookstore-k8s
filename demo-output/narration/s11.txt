@@ -1,1 +1,1 @@
-When traffic spikes, the Horizontal Pod Autoscaler scales the backend from two to five replicas based on CPU utilization. We verified this with k6 load testing at 150 virtual users.
+Horizontal Pod Autoscaler monitors CPU utilization every 15 seconds. When load increases, it automatically scales the backend from two to five replicas. Here we run a k6 load test with 150 virtual users. Watch the replica count increase as CPU crosses the 70 percent threshold.

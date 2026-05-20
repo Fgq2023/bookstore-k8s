@@ -1,1 +1,1 @@
-Order placement is wrapped in an ACID database transaction: create order, deduct stock, clear cart, and invalidate the Redis cache — all succeed or all rollback. The order state machine tracks every transition in a JSONB audit trail.
+The detail view shows complete book metadata. Adding to cart triggers a POST request with session isolation. The reactive cart counter updates globally across the application.
