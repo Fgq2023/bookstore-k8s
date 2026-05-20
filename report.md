@@ -8,7 +8,7 @@
 
 ### 1.1 Objective
 
-The goal of this project is to design, implement, and deploy a **production-ready, cloud-native online bookstore system** on Kubernetes. The system demonstrates modern cloud engineering practices including containerization, microservice-style decomposition, declarative infrastructure management, automated testing, and comprehensive observability.
+The goal of this project is to design, implement, and deploy a **production-ready, cloud-native online bookstore system** on Kubernetes. The system demonstrates modern cloud engineering practices including containerization, microservice-style decomposition, declarative infrastructure management, automated testing, comprehensive observability, and security hardening.
 
 ### 1.2 Motivation
 
@@ -18,8 +18,9 @@ Cloud-native applications are the industry standard for deploying scalable and r
 - **Kubernetes** for orchestration, scaling, and self-healing
 - **Observability** for understanding system behavior under load
 - **Security** for protecting user data and business logic
+- **Caching** for performance optimization under high load
 
-By building a complete bookstore application from frontend to database, we gain practical experience in the full lifecycle of a cloud-native system: design → implement → test → deploy → monitor.
+By building a complete bookstore application from frontend to database, we gain practical experience in the full lifecycle of a cloud-native system: design → implement → test → deploy → monitor → optimize.
 
 ### 1.3 Scope
 
@@ -27,12 +28,14 @@ The implemented system supports the following core features:
 
 | Feature | Description |
 |---------|-------------|
-| **Browse & Search Books** | Paginated book catalog with title/author search |
-| **Shopping Cart** | Add, update, remove items with session isolation |
+| **Browse & Search Books** | Paginated book catalog with title/author search, Redis caching |
+| **Shopping Cart** | Add, update, remove items with session isolation and IDOR protection |
 | **Order Placement** | ACID transaction: order creation, stock deduction, cart cleanup |
 | **Payment Mock** | Simulated payment gateway with order state transitions |
 | **User Authentication** | JWT-based registration and login with role-based access |
 | **Admin Dashboard** | Protected metrics view for administrative users |
+| **Auto-scaling** | HPA scales backend (2→5) and frontend (1→3) by CPU utilization |
+| **Monitoring & Alerting** | Prometheus metrics, Grafana dashboards, Alertmanager rules |
 
 ---
 
@@ -77,11 +80,11 @@ The system follows a **three-tier architecture** deployed on a single-node Kuber
 | **Frontend** | Vue 3.4 + Vite + Tailwind CSS + nginx | Modern reactive UI, fast build, minimal container footprint |
 | **Backend** | Python 3.11 + Flask + Gunicorn | Lightweight, flexible, extensive ecosystem |
 | **Database** | PostgreSQL 15 + Alembic | Reliable relational store with schema migration support |
-| **Cache** | Redis 7 (with memory fallback) | Distributed caching for multi-replica consistency |
+| **Cache** | Redis 7 (with memory fallback) | Distributed caching for multi-replica consistency; graceful degradation |
 | **Auth** | PyJWT + Werkzeug | Industry-standard token-based authentication |
 | **Orchestration** | Kubernetes + Kustomize | Declarative, version-controlled infrastructure |
-| **Observability** | Prometheus + Grafana + Alertmanager | Metrics collection, visualization, and alerting |
-| **CI/CD** | GitHub Actions | Automated lint, test, build, and security scanning |
+| **Observability** | Prometheus + Grafana + Alertmanager | Metrics collection, visualization, and proactive alerting |
+| **CI/CD** | GitHub Actions 8-stage pipeline | Automated lint, test, build, security scanning, and deployment validation |
 
 ### 2.3 Kubernetes Resources
 
@@ -98,8 +101,9 @@ The application is deployed using **Kustomize** with a base + overlay structure:
 | `ConfigMap/Secret` | Non-sensitive config and DB credentials |
 | `PVC` | Persistent storage for PostgreSQL |
 | `ServiceMonitor` | Prometheus scrape configuration |
-| `PrometheusRule` | Alertmanager alert definitions |
+| `PrometheusRule` | Alertmanager alert definitions (5 critical alerts) |
 | `Grafana Dashboard` | Pre-configured 6-panel monitoring dashboard |
+| `InitContainer` | Runs `alembic upgrade head` before app starts |
 
 ### 2.4 Data Flow
 
@@ -109,10 +113,11 @@ A typical user request flows through the system as follows:
 2. **Ingress Controller** routes to frontend or backend based on path
 3. **Frontend Pod** (nginx) serves Vue SPA or proxies `/api/` to backend
 4. **Backend Pod** (Flask) processes request:
-   - Check Redis cache for book listings
+   - Check **Redis cache** for book listings (fallback to memory if Redis unavailable)
    - Query PostgreSQL via connection pool if cache miss
    - Return JSON response with `X-Request-ID` header
 5. **Prometheus** scrapes `/metrics` endpoint every 15s
+6. **Alertmanager** evaluates rules and triggers alerts if thresholds exceeded
 
 ---
 
@@ -132,12 +137,12 @@ src/backend/
 │   ├── auth.py         # JWT registration/login
 │   ├── payments.py     # Payment state machine
 │   ├── admin.py        # Admin-only endpoints
-│   └── probes.py       # Health checks and Prometheus metrics
+│   └── probes.py       # Health checks and Prometheus metrics (now with DB pool metrics)
 ├── utils/
-│   ├── db.py           # Connection pool + transaction context manager
+│   ├── db.py           # Connection pool + transaction context manager + pool metrics
 │   ├── cache.py        # Redis cache with memory fallback
 │   ├── auth.py         # JWT generation and verification
-│   ├── metrics.py      # Prometheus-style counters
+│   ├── metrics.py      # Prometheus-style counters (added pool metrics)
 │   └── response.py     # JSON serialization with Decimal support
 ├── schemas.py          # Pydantic v2 validation models
 └── alembic/            # Database migration scripts (4 versions)
@@ -147,9 +152,13 @@ src/backend/
 
 1. **Connection Pool Management**: A `ThreadedConnectionPool` (min=1, max=20) is initialized at startup. A custom `db_transaction()` context manager wraps multi-step operations (order creation) in explicit `BEGIN/COMMIT/ROLLBACK` blocks.
 
-2. **Distributed Cache with Fallback**: The `utils/cache.py` module attempts to connect to Redis first. If Redis is unavailable (e.g., in local development), it seamlessly falls back to an in-memory dictionary. This ensures the application works out-of-the-box without Redis.
+2. **Real-time Pool Metrics**: The `_update_pool_metrics()` function tracks `db_pool_used_connections` and `db_pool_free_connections` on every `getconn()`/`putconn()`, enabling real-time capacity monitoring via `/metrics` and Grafana.
 
-3. **Lazy psycopg2 Imports**: All route files import `RealDictCursor` from `utils.db` rather than directly from `psycopg2`, allowing the application to start and serve fallback mode even when PostgreSQL is not installed.
+3. **Distributed Cache with Fallback**: The `utils/cache.py` module attempts to connect to Redis first. If Redis is unavailable (e.g., in local development), it seamlessly falls back to an in-memory dictionary. This ensures the application works out-of-the-box without Redis.
+
+4. **Lazy psycopg2 Imports**: All route files import `RealDictCursor` from `utils.db` rather than directly from `psycopg2`, allowing the application to start and serve fallback mode even when PostgreSQL is not installed.
+
+5. **Pydantic Error Beautification**: The `format_validation_errors()` helper converts raw Pydantic jargon (`Input should be a valid string`) into user-friendly messages (`must be a valid string`), preventing internal field names from leaking to clients.
 
 ### 3.2 Frontend Architecture
 
@@ -174,6 +183,12 @@ src/frontend/src/
 - **JWT Interceptor**: Automatically injects `Authorization: Bearer` header and handles 401 globally
 - **Route Guards**: `/profile` and `/admin` require authentication; `/login` redirects authenticated users
 - **Session Management**: `session_id` persisted in `localStorage` for cart isolation
+
+**Build Configuration:**
+- `.dockerignore`: Excludes `node_modules/` and `e2e/` from Docker build context
+- `Dockerfile`: Uses `npm ci` (not `npm install`) for reproducible builds
+- `vite.config.js`: Development proxy forwards `/api/` to localhost:8000
+- `playwright.config.js`: E2E test configuration with Vite dev server auto-start
 
 ### 3.3 Database Design
 
@@ -207,6 +222,7 @@ The PostgreSQL schema evolved through 4 Alembic migrations:
 | **Container Security** | Non-root user (`runAsUser: 1000`), dropped capabilities, `allowPrivilegeEscalation: false` |
 | **Network Isolation** | `NetworkPolicy` restricts traffic: ingress→frontend→backend→db/redis only |
 | **Vulnerability Scanning** | Trivy scans on every CI build; results uploaded to GitHub Security tab |
+| **Input Validation** | Pydantic v2 strict mode; user-friendly error messages without internal field leakage |
 
 ---
 
@@ -252,6 +268,9 @@ Every backend pod starts with an `initContainer` that runs `alembic upgrade head
 
 **Graceful Shutdown:**
 Flask catches `SIGTERM`/`SIGINT`, closes the DB connection pool, and exits cleanly. Gunicorn runs with `--graceful-timeout 30 --timeout 120` to drain in-flight requests.
+
+**Topology Spread Constraints:**
+Backend pods are distributed across nodes using `topologySpreadConstraints` (maxSkew: 1, topologyKey: `kubernetes.io/hostname`, whenUnsatisfiable: `ScheduleAnyway`), preventing all replicas from scheduling on the same node.
 
 ---
 
@@ -301,12 +320,17 @@ GitHub Actions runs an 8-stage pipeline on every push/PR:
 
 1. **Lint** — Hadolint (Dockerfiles), kubeconform (K8s manifests)
 2. **Backend Unit Tests** — pytest with coverage report (required)
-3. **Backend Integration Tests** — testcontainers + Playwright (optional)
-4. **Frontend Unit Tests** — Vitest component tests + `vite build`
-5. **Frontend E2E Tests** — Playwright browser automation (optional)
+3. **Backend Integration Tests** — testcontainers + Playwright API (optional, `continue-on-error`)
+4. **Frontend Unit Tests** — Vitest component tests + `vite build` (required)
+5. **Frontend E2E Tests** — Playwright browser automation (optional, `continue-on-error`)
 6. **Build** — Docker Buildx with GitHub Actions cache
 7. **Security Scan** — Trivy SARIF → GitHub Security tab
 8. **Deploy Check** — Kustomize build validation
+
+**Key CI Design Decisions:**
+- Integration and E2E tests run with `continue-on-error: true` so they don't block the pipeline when external dependencies (Docker socket, Playwright browsers) are unavailable
+- Required jobs (`test-backend`, `test-frontend`) must pass before `build` and `security-scan`
+- Artifact upload uses `if-no-files-found: warn` to prevent failures when optional test reports don't exist
 
 ---
 
@@ -338,11 +362,12 @@ GitHub Actions runs an 8-stage pipeline on every push/PR:
 This project demonstrates a **complete, production-oriented cloud-native application** built from the ground up. Key achievements include:
 
 - **Architecture**: A clean three-tier design with proper separation of concerns
-- **Kubernetes**: Comprehensive use of Deployments, Services, Ingress, HPA, PDB, NetworkPolicy, and ConfigMaps
-- **Observability**: Prometheus metrics, Grafana dashboards, Alertmanager rules, and X-Request-ID tracing
-- **Security**: JWT authentication, rate limiting, IDOR fixes, security headers, and non-root containers
-- **Reliability**: Graceful shutdown, health probes, topology spread constraints, and ACID transactions
-- **Quality**: 115 automated tests with 90% backend coverage, CI/CD pipeline, and security scanning
+- **Kubernetes**: Comprehensive use of Deployments, Services, Ingress, HPA, PDB, NetworkPolicy, ConfigMaps, and topology spread constraints
+- **Caching**: Redis distributed cache with graceful memory fallback, ensuring multi-replica consistency
+- **Observability**: Prometheus metrics (including real-time DB pool monitoring), Grafana dashboards, Alertmanager rules, and X-Request-ID tracing
+- **Security**: JWT authentication, rate limiting, IDOR fixes, security headers, non-root containers, and vulnerability scanning
+- **Reliability**: Graceful shutdown, three-tier health probes, ACID transactions, and initContainer migrations
+- **Quality**: 115 automated tests with 90% backend coverage, multi-layer testing pyramid, and 8-stage CI/CD pipeline
 
 The system successfully deploys on Minikube with a single command (`make deploy-tag`) and provides a solid foundation for production deployment on any Kubernetes cluster.
 
@@ -360,4 +385,4 @@ The system successfully deploys on Minikube with a single command (`make deploy-
 
 ---
 
-*Report generated on May 20, 2026*
+*Report updated on May 20, 2026*

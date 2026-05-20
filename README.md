@@ -111,8 +111,9 @@ make test     # Wait for rollout and print frontend URL
 │   │   ├── app.py               # Flask application factory (create_app)
 │   │   ├── main.py              # Compatibility entrypoint for gunicorn
 │   │   ├── schemas.py           # Pydantic v2 request/response validation
-│   │   ├── requirements.txt     # Python deps (Flask, Gunicorn, PyJWT, Flask-Limiter, Pydantic)
+│   │   ├── requirements.txt     # Python deps (Flask, Gunicorn, PyJWT, Flask-Limiter, Pydantic, Redis)
 │   │   ├── Dockerfile
+│   │   ├── .dockerignore        # Excludes __pycache__/tests/ from build context
 │   │   ├── alembic.ini          # Alembic configuration
 │   │   ├── alembic/
 │   │   │   ├── env.py
@@ -134,11 +135,11 @@ make test     # Wait for rollout and print frontend URL
 │   │   │   ├── __init__.py
 │   │   │   ├── db.py            # psycopg2 connection pool + db_transaction context manager
 │   │   │   ├── auth.py          # JWT helpers + @jwt_required
-│   │   │   ├── cache.py         # TTL in-memory cache
+│   │   │   ├── cache.py         # Redis distributed cache with memory fallback
 │   │   │   ├── metrics.py       # Prometheus counters
 │   │   │   ├── response.py      # json_response + DecimalEncoder
 │   │   │   └── fallback.py      # In-memory fallback data
-│   │   └── tests/               # pytest suite (112 cases, 90% cov)
+│   │   └── tests/               # pytest suite (82 cases, 90% cov)
 │   │       ├── conftest.py
 │   │       ├── e2e/             # Playwright end-to-end tests
 │   │       │   └── test_shopping_flow.py
@@ -155,11 +156,15 @@ make test     # Wait for rollout and print frontend URL
 │   │       └── test_errors.py
 │   └── frontend/
 │       ├── package.json         # Vue 3 + Vite + Tailwind + Vue Router + Axios
+│       ├── package-lock.json    # Lockfile for reproducible builds
 │       ├── vite.config.js
+│       ├── vitest.config.js     # Vitest unit test configuration
+│       ├── playwright.config.js # Playwright E2E configuration
 │       ├── tailwind.config.js
 │       ├── index.html           # Vite entry
 │       ├── nginx.conf           # /api/ proxy + SPA routing + probes
 │       ├── Dockerfile           # Multi-stage: node build -> nginx serve
+│       ├── .dockerignore        # Excludes node_modules/tests from build context
 │       └── src/
 │           ├── main.js          # Vue app bootstrap
 │           ├── App.vue          # Root layout
@@ -177,12 +182,14 @@ make test     # Wait for rollout and print frontend URL
 │               ├── ProfileView.vue  # User profile + orders
 │               ├── AdminView.vue    # Admin metrics dashboard
 │               ├── Toast.vue        # Notifications
-│               └── __tests__/       # Vue component + API tests
-│                   ├── BookCard.spec.js
-│                   ├── CartView.spec.js
-│                   ├── LoginView.spec.js
-│                   ├── Navbar.spec.js
-│                   └── client.integration.spec.js
+│               ├── __tests__/       # Vue component + API tests
+│               │   ├── BookCard.spec.js
+│               │   ├── CartView.spec.js
+│               │   ├── LoginView.spec.js
+│               │   ├── Navbar.spec.js
+│               │   └── client.integration.spec.js
+│               └── e2e/             # Playwright browser E2E tests
+│                   └── shopping-flow.spec.js
 ├── k8s/
 │   ├── base/                    # Base manifests
 │   │   ├── deployment-backend.yaml
@@ -442,6 +449,8 @@ PrometheusRule CRD defines 5 critical alerts:
 | `http_request_duration_seconds` | Counter | Cumulative request duration |
 | `db_connections_success_total` | Counter | Successful DB connections |
 | `db_connections_failed_total` | Counter | Failed DB connections |
+| `db_pool_used_connections` | Gauge | Currently active DB pool connections |
+| `db_pool_free_connections` | Gauge | Available DB pool connections |
 | `orders_created_total` | Counter | Orders placed |
 | `cart_items_added_total` | Counter | Items added to cart |
 
