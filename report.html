@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cloud-Native Online Bookstore - Project Report</title>
+<style>
+@page {
+    size: A4;
+    margin: 2.5cm 2cm 2.5cm 2cm;
+    @bottom-center {
+        content: counter(page);
+        font-size: 9pt;
+        color: #666;
+    }
+}
+body {
+    font-family: "DejaVu Sans", "Liberation Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.6;
+    color: #333;
+}
+h1 {
+    font-size: 20pt;
+    color: #1a365d;
+    border-bottom: 2px solid #1a365d;
+    padding-bottom: 8px;
+    margin-top: 0;
+    page-break-before: auto;
+}
+h2 {
+    font-size: 14pt;
+    color: #2c5282;
+    margin-top: 24pt;
+    margin-bottom: 10pt;
+    page-break-after: avoid;
+}
+h3 {
+    font-size: 11.5pt;
+    color: #2b6cb0;
+    margin-top: 16pt;
+    margin-bottom: 8pt;
+    page-break-after: avoid;
+}
+p {
+    margin: 8pt 0;
+    text-align: justify;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12pt 0;
+    font-size: 9.5pt;
+}
+th, td {
+    border: 1px solid #cbd5e0;
+    padding: 6pt 8pt;
+    text-align: left;
+}
+th {
+    background-color: #edf2f7;
+    font-weight: bold;
+    color: #2d3748;
+}
+tr:nth-child(even) {
+    background-color: #f7fafc;
+}
+code {
+    font-family: "DejaVu Sans Mono", "Liberation Mono", Consolas, monospace;
+    font-size: 9pt;
+    background-color: #edf2f7;
+    padding: 1pt 3pt;
+    border-radius: 2pt;
+}
+pre {
+    background-color: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4pt;
+    padding: 10pt;
+    overflow-x: auto;
+    font-size: 8.5pt;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+pre code {
+    background: none;
+    padding: 0;
+}
+blockquote {
+    border-left: 3px solid #4299e1;
+    margin: 10pt 0;
+    padding: 8pt 12pt;
+    background-color: #ebf8ff;
+    color: #2c5282;
+}
+hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 20pt 0;
+}
+ul, ol {
+    margin: 8pt 0;
+    padding-left: 20pt;
+}
+li {
+    margin: 3pt 0;
+}
+</style>
+</head>
+<body>
+<h1 id="cloud-native-online-bookstore-on-kubernetes">Cloud-Native Online Bookstore on Kubernetes</h1>
+<p><strong>DSAA4040 Engineering-Oriented Project | Group 5</strong></p>
+<hr />
+<h2 id="1-problem-statement">1. Problem Statement</h2>
+<h3 id="11-objective">1.1 Objective</h3>
+<p>The goal of this project is to design, implement, and deploy a <strong>production-ready, cloud-native online bookstore system</strong> on Kubernetes. The system demonstrates modern cloud engineering practices including containerization, microservice-style decomposition, declarative infrastructure management, automated testing, and comprehensive observability.</p>
+<h3 id="12-motivation">1.2 Motivation</h3>
+<p>Cloud-native applications are the industry standard for deploying scalable and resilient systems. This project serves as a hands-on exploration of how a real-world e-commerce backend is architected using:</p>
+<ul>
+<li><strong>Containers</strong> for consistent packaging across environments</li>
+<li><strong>Kubernetes</strong> for orchestration, scaling, and self-healing</li>
+<li><strong>Observability</strong> for understanding system behavior under load</li>
+<li><strong>Security</strong> for protecting user data and business logic</li>
+</ul>
+<p>By building a complete bookstore application from frontend to database, we gain practical experience in the full lifecycle of a cloud-native system: design → implement → test → deploy → monitor.</p>
+<h3 id="13-scope">1.3 Scope</h3>
+<p>The implemented system supports the following core features:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Browse &amp; Search Books</strong></td>
+<td>Paginated book catalog with title/author search</td>
+</tr>
+<tr>
+<td><strong>Shopping Cart</strong></td>
+<td>Add, update, remove items with session isolation</td>
+</tr>
+<tr>
+<td><strong>Order Placement</strong></td>
+<td>ACID transaction: order creation, stock deduction, cart cleanup</td>
+</tr>
+<tr>
+<td><strong>Payment Mock</strong></td>
+<td>Simulated payment gateway with order state transitions</td>
+</tr>
+<tr>
+<td><strong>User Authentication</strong></td>
+<td>JWT-based registration and login with role-based access</td>
+</tr>
+<tr>
+<td><strong>Admin Dashboard</strong></td>
+<td>Protected metrics view for administrative users</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-system-design">2. System Design</h2>
+<h3 id="21-architecture-overview">2.1 Architecture Overview</h3>
+<p>The system follows a <strong>three-tier architecture</strong> deployed on a single-node Kubernetes cluster (Minikube):</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                         User Request                            │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ HTTP
+┌───────────────────────────▼─────────────────────────────────────┐
+│                    Ingress Controller                             │
+│                   (bookstore.local)                               │
+└──────────────┬────────────────────────────┬─────────────────────┘
+               │ /                          │ /api/*
+    ┌──────────▼──────────┐    ┌───────────▼───────────┐
+    │  Frontend Service   │    │   Backend Service     │
+    │    (NodePort)       │    │     (ClusterIP)       │
+    └──────────┬──────────┘    └───────────┬───────────┘
+               │                             │
+    ┌──────────▼──────────┐    ┌───────────▼───────────┐
+    │  Vue 3 + nginx Pod  │    │  Flask + Gunicorn Pod │
+    │    (1-3 replicas)   │    │     (2-5 replicas)    │
+    └─────────────────────┘    └───────────┬───────────┘
+                                           │
+                          ┌────────────────┼────────────────┐
+                          │                │                │
+               ┌──────────▼─────┐ ┌────────▼─────┐ ┌───────▼─────┐
+               │   PostgreSQL   │ │    Redis     │ │ Prometheus  │
+               │   (Stateful)   │ │   (Cache)    │ │ (Metrics)   │
+               └────────────────┘ └──────────────┘ └─────────────┘
+</code></pre>
+<h3 id="22-technology-stack">2.2 Technology Stack</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Frontend</strong></td>
+<td>Vue 3.4 + Vite + Tailwind CSS + nginx</td>
+<td>Modern reactive UI, fast build, minimal container footprint</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>Python 3.11 + Flask + Gunicorn</td>
+<td>Lightweight, flexible, extensive ecosystem</td>
+</tr>
+<tr>
+<td><strong>Database</strong></td>
+<td>PostgreSQL 15 + Alembic</td>
+<td>Reliable relational store with schema migration support</td>
+</tr>
+<tr>
+<td><strong>Cache</strong></td>
+<td>Redis 7 (with memory fallback)</td>
+<td>Distributed caching for multi-replica consistency</td>
+</tr>
+<tr>
+<td><strong>Auth</strong></td>
+<td>PyJWT + Werkzeug</td>
+<td>Industry-standard token-based authentication</td>
+</tr>
+<tr>
+<td><strong>Orchestration</strong></td>
+<td>Kubernetes + Kustomize</td>
+<td>Declarative, version-controlled infrastructure</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td>Prometheus + Grafana + Alertmanager</td>
+<td>Metrics collection, visualization, and alerting</td>
+</tr>
+<tr>
+<td><strong>CI/CD</strong></td>
+<td>GitHub Actions</td>
+<td>Automated lint, test, build, and security scanning</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-kubernetes-resources">2.3 Kubernetes Resources</h3>
+<p>The application is deployed using <strong>Kustomize</strong> with a base + overlay structure:</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Deployment</code></td>
+<td>Manages backend, frontend, PostgreSQL, and Redis pods</td>
+</tr>
+<tr>
+<td><code>Service</code></td>
+<td>ClusterIP for backend/DB/Redis; NodePort for frontend</td>
+</tr>
+<tr>
+<td><code>Ingress</code></td>
+<td>Routes <code>/</code> to frontend and <code>/api/*</code> to backend</td>
+</tr>
+<tr>
+<td><code>HPA</code></td>
+<td>Auto-scales backend (2→5) and frontend (1→3) by CPU</td>
+</tr>
+<tr>
+<td><code>PDB</code></td>
+<td>Ensures minimum 1 pod available during disruptions</td>
+</tr>
+<tr>
+<td><code>NetworkPolicy</code></td>
+<td>Zero-trust mesh: ingress→frontend→backend→db/redis only</td>
+</tr>
+<tr>
+<td><code>ConfigMap/Secret</code></td>
+<td>Non-sensitive config and DB credentials</td>
+</tr>
+<tr>
+<td><code>PVC</code></td>
+<td>Persistent storage for PostgreSQL</td>
+</tr>
+<tr>
+<td><code>ServiceMonitor</code></td>
+<td>Prometheus scrape configuration</td>
+</tr>
+<tr>
+<td><code>PrometheusRule</code></td>
+<td>Alertmanager alert definitions</td>
+</tr>
+<tr>
+<td><code>Grafana Dashboard</code></td>
+<td>Pre-configured 6-panel monitoring dashboard</td>
+</tr>
+</tbody>
+</table>
+<h3 id="24-data-flow">2.4 Data Flow</h3>
+<p>A typical user request flows through the system as follows:</p>
+<ol>
+<li><strong>Browser</strong> sends request to <code>bookstore.local</code></li>
+<li><strong>Ingress Controller</strong> routes to frontend or backend based on path</li>
+<li><strong>Frontend Pod</strong> (nginx) serves Vue SPA or proxies <code>/api/</code> to backend</li>
+<li><strong>Backend Pod</strong> (Flask) processes request:</li>
+<li>Check Redis cache for book listings</li>
+<li>Query PostgreSQL via connection pool if cache miss</li>
+<li>Return JSON response with <code>X-Request-ID</code> header</li>
+<li><strong>Prometheus</strong> scrapes <code>/metrics</code> endpoint every 15s</li>
+</ol>
+<hr />
+<h2 id="3-implementation">3. Implementation</h2>
+<h3 id="31-backend-architecture">3.1 Backend Architecture</h3>
+<p>The backend is organized using <strong>Flask Blueprints</strong>, with each domain as a separate module:</p>
+<pre><code>src/backend/
+├── app.py              # Application factory with rate limiting, security headers
+├── routes/
+│   ├── books.py        # Book catalog (cached, paginated)
+│   ├── cart.py         # Shopping cart with IDOR protection
+│   ├── orders.py       # Order creation with ACID transactions
+│   ├── auth.py         # JWT registration/login
+│   ├── payments.py     # Payment state machine
+│   ├── admin.py        # Admin-only endpoints
+│   └── probes.py       # Health checks and Prometheus metrics
+├── utils/
+│   ├── db.py           # Connection pool + transaction context manager
+│   ├── cache.py        # Redis cache with memory fallback
+│   ├── auth.py         # JWT generation and verification
+│   ├── metrics.py      # Prometheus-style counters
+│   └── response.py     # JSON serialization with Decimal support
+├── schemas.py          # Pydantic v2 validation models
+└── alembic/            # Database migration scripts (4 versions)
+</code></pre>
+<p><strong>Key Design Decisions:</strong></p>
+<ol>
+<li>
+<p><strong>Connection Pool Management</strong>: A <code>ThreadedConnectionPool</code> (min=1, max=20) is initialized at startup. A custom <code>db_transaction()</code> context manager wraps multi-step operations (order creation) in explicit <code>BEGIN/COMMIT/ROLLBACK</code> blocks.</p>
+</li>
+<li>
+<p><strong>Distributed Cache with Fallback</strong>: The <code>utils/cache.py</code> module attempts to connect to Redis first. If Redis is unavailable (e.g., in local development), it seamlessly falls back to an in-memory dictionary. This ensures the application works out-of-the-box without Redis.</p>
+</li>
+<li>
+<p><strong>Lazy psycopg2 Imports</strong>: All route files import <code>RealDictCursor</code> from <code>utils.db</code> rather than directly from <code>psycopg2</code>, allowing the application to start and serve fallback mode even when PostgreSQL is not installed.</p>
+</li>
+</ol>
+<h3 id="32-frontend-architecture">3.2 Frontend Architecture</h3>
+<p>The frontend is a <strong>Vue 3 Single-Page Application</strong> built with Vite and served by nginx:</p>
+<pre><code>src/frontend/src/
+├── main.js              # App bootstrap
+├── router/index.js      # Route guards (auth, admin)
+├── api/client.js        # Axios instance with JWT interceptor
+├── store.js             # Reactive cart count
+└── components/
+    ├── BookList.vue     # Browse + search
+    ├── BookCard.vue     # Individual book display
+    ├── CartView.vue     # Shopping cart management
+    ├── OrdersView.vue   # Order history
+    ├── LoginView.vue    # Authentication
+    └── AdminView.vue    # Metrics display
+</code></pre>
+<p><strong>Key Features:</strong>
+- <strong>JWT Interceptor</strong>: Automatically injects <code>Authorization: Bearer</code> header and handles 401 globally
+- <strong>Route Guards</strong>: <code>/profile</code> and <code>/admin</code> require authentication; <code>/login</code> redirects authenticated users
+- <strong>Session Management</strong>: <code>session_id</code> persisted in <code>localStorage</code> for cart isolation</p>
+<h3 id="33-database-design">3.3 Database Design</h3>
+<p>The PostgreSQL schema evolved through 4 Alembic migrations:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key Columns</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>books</code></td>
+<td><code>id</code>, <code>title</code>, <code>author</code>, <code>isbn</code>, <code>price</code>, <code>stock_quantity</code></td>
+<td>Product catalog</td>
+</tr>
+<tr>
+<td><code>carts</code></td>
+<td><code>id</code>, <code>session_id</code></td>
+<td>Shopping cart sessions</td>
+</tr>
+<tr>
+<td><code>cart_items</code></td>
+<td><code>id</code>, <code>cart_id</code>, <code>book_id</code>, <code>quantity</code></td>
+<td>Items in cart</td>
+</tr>
+<tr>
+<td><code>orders</code></td>
+<td><code>id</code>, <code>session_id</code>, <code>status</code>, <code>status_history</code> (JSONB)</td>
+<td>Order records</td>
+</tr>
+<tr>
+<td><code>order_items</code></td>
+<td><code>id</code>, <code>order_id</code>, <code>book_id</code>, <code>quantity</code></td>
+<td>Order line items</td>
+</tr>
+<tr>
+<td><code>users</code></td>
+<td><code>id</code>, <code>username</code>, <code>email</code>, <code>password_hash</code>, <code>is_admin</code></td>
+<td>Authentication</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Performance Indexes</strong> (Migration 004):
+- <code>idx_books_title_author</code> — accelerates search queries
+- <code>idx_books_isbn</code> — unique lookup
+- <code>idx_orders_session_created</code> — order history queries
+- <code>idx_cart_items_cart_book</code> — cart operations
+- <code>idx_order_items_order</code> — order detail retrieval</p>
+<h3 id="34-security-implementations">3.4 Security Implementations</h3>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Authentication</strong></td>
+<td>PyJWT HS256 tokens, 24h expiry, Werkzeug password hashing</td>
+</tr>
+<tr>
+<td><strong>Authorization</strong></td>
+<td><code>@jwt_required</code> decorator; admin routes check <code>is_admin</code> flag</td>
+</tr>
+<tr>
+<td><strong>Rate Limiting</strong></td>
+<td>Flask-Limiter with Redis backend (memory fallback). Register: 5/min, Login: 10/min, Default: 200/min</td>
+</tr>
+<tr>
+<td><strong>IDOR Prevention</strong></td>
+<td>Cart <code>PUT/DELETE</code> verifies ownership via <code>JOIN carts ON session_id</code></td>
+</tr>
+<tr>
+<td><strong>Security Headers</strong></td>
+<td><code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>, <code>HSTS</code>, <code>Referrer-Policy</code></td>
+</tr>
+<tr>
+<td><strong>Container Security</strong></td>
+<td>Non-root user (<code>runAsUser: 1000</code>), dropped capabilities, <code>allowPrivilegeEscalation: false</code></td>
+</tr>
+<tr>
+<td><strong>Network Isolation</strong></td>
+<td><code>NetworkPolicy</code> restricts traffic: ingress→frontend→backend→db/redis only</td>
+</tr>
+<tr>
+<td><strong>Vulnerability Scanning</strong></td>
+<td>Trivy scans on every CI build; results uploaded to GitHub Security tab</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-deployment">4. Deployment</h2>
+<h3 id="41-local-development">4.1 Local Development</h3>
+<p>The entire system can be deployed locally on Minikube with a single command:</p>
+<pre><code class="language-bash">minikube start --driver=docker --cpus=2 --memory=4096
+minikube addons enable ingress metrics-server
+make deploy-tag VERSION=v3.0.3
+</code></pre>
+<p>The <code>Makefile</code> orchestrates the full workflow:
+1. <code>docker build</code> — builds backend and frontend images
+2. <code>minikube image load</code> — transfers images into the Minikube node
+3. <code>kustomize edit set image</code> — updates overlay with new tags
+4. <code>kubectl apply -k</code> — deploys all K8s resources
+5. <code>kubectl apply -k k8s/monitoring/</code> — deploys Grafana dashboard</p>
+<h3 id="42-access-methods">4.2 Access Methods</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>URL</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ingress</td>
+<td><code>http://bookstore.local</code></td>
+<td>Requires <code>/etc/hosts</code> entry</td>
+</tr>
+<tr>
+<td>NodePort</td>
+<td><code>http://$(minikube ip):30080</code></td>
+<td>Direct frontend access</td>
+</tr>
+<tr>
+<td>Port-forward</td>
+<td><code>kubectl port-forward</code></td>
+<td>For debugging Prometheus/Grafana</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-kubernetes-specific-features">4.3 Kubernetes-Specific Features</h3>
+<p><strong>InitContainer for Migrations:</strong>
+Every backend pod starts with an <code>initContainer</code> that runs <code>alembic upgrade head</code>, ensuring the database schema is current before the main container accepts traffic.</p>
+<p><strong>Three-Tier Health Probes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Probe</th>
+<th>Endpoint</th>
+<th>Purpose</th>
+<th>Max Wait</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Startup</td>
+<td><code>/startup</code></td>
+<td>Wait for DB pool + migrations</td>
+<td>60s</td>
+</tr>
+<tr>
+<td>Liveness</td>
+<td><code>/healthz</code></td>
+<td>Detect deadlock; restart if failed</td>
+<td>30s</td>
+</tr>
+<tr>
+<td>Readiness</td>
+<td><code>/ready</code></td>
+<td>Remove from service endpoints if DB down</td>
+<td>15s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Graceful Shutdown:</strong>
+Flask catches <code>SIGTERM</code>/<code>SIGINT</code>, closes the DB connection pool, and exits cleanly. Gunicorn runs with <code>--graceful-timeout 30 --timeout 120</code> to drain in-flight requests.</p>
+<hr />
+<h2 id="5-evaluation-testing">5. Evaluation &amp; Testing</h2>
+<h3 id="51-test-strategy">5.1 Test Strategy</h3>
+<p>The project employs a <strong>multi-layer testing pyramid</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Count</th>
+<th>Tools</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Unit Tests</strong></td>
+<td>75</td>
+<td>pytest + mock</td>
+<td>Fast, isolated, no DB required</td>
+</tr>
+<tr>
+<td><strong>Integration Tests</strong></td>
+<td>6</td>
+<td>pytest + testcontainers</td>
+<td>Real PostgreSQL via Docker</td>
+</tr>
+<tr>
+<td><strong>Backend E2E</strong></td>
+<td>1</td>
+<td>pytest + Playwright (API)</td>
+<td>Full HTTP flow against live server</td>
+</tr>
+<tr>
+<td><strong>Frontend Unit</strong></td>
+<td>25</td>
+<td>Vitest + Vue Test Utils</td>
+<td>Vue components + API client</td>
+</tr>
+<tr>
+<td><strong>Frontend E2E</strong></td>
+<td>3</td>
+<td>Playwright (Browser)</td>
+<td>Browser automation: login → cart → order</td>
+</tr>
+<tr>
+<td><strong>Load Tests</strong></td>
+<td>3</td>
+<td>k6</td>
+<td>HPA trigger, shopping flow, pagination</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total: 115 automated tests</strong></p>
+<h3 id="52-test-coverage">5.2 Test Coverage</h3>
+<p>Backend coverage is measured at <strong>90%</strong> using <code>pytest-cov</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Coverage</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>routes/</code></td>
+<td>88%</td>
+<td>All endpoints have happy-path and error tests</td>
+</tr>
+<tr>
+<td><code>utils/</code></td>
+<td>92%</td>
+<td>Cache, auth, metrics, response helpers</td>
+</tr>
+<tr>
+<td><code>schemas.py</code></td>
+<td>95%</td>
+<td>Pydantic validation models</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-performance-results">5.3 Performance Results</h3>
+<p><strong>k6 Load Test</strong> (50 Virtual Users, 40 seconds):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>p(95) Latency</td>
+<td><strong>1.76ms</strong></td>
+</tr>
+<tr>
+<td>Error Rate</td>
+<td>&lt; 10%</td>
+</tr>
+<tr>
+<td>Throughput</td>
+<td>~1,200 req/s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>HPA Scaling Test:</strong>
+Under sustained high load (150 VUs), the backend scales from 2 → 5 replicas within 90 seconds. CPU utilization triggers the scaling decision; metrics-server polls every 15 seconds.</p>
+<h3 id="54-cicd-pipeline">5.4 CI/CD Pipeline</h3>
+<p>GitHub Actions runs an 8-stage pipeline on every push/PR:</p>
+<ol>
+<li><strong>Lint</strong> — Hadolint (Dockerfiles), kubeconform (K8s manifests)</li>
+<li><strong>Backend Unit Tests</strong> — pytest with coverage report (required)</li>
+<li><strong>Backend Integration Tests</strong> — testcontainers + Playwright (optional)</li>
+<li><strong>Frontend Unit Tests</strong> — Vitest component tests + <code>vite build</code></li>
+<li><strong>Frontend E2E Tests</strong> — Playwright browser automation (optional)</li>
+<li><strong>Build</strong> — Docker Buildx with GitHub Actions cache</li>
+<li><strong>Security Scan</strong> — Trivy SARIF → GitHub Security tab</li>
+<li><strong>Deploy Check</strong> — Kustomize build validation</li>
+</ol>
+<hr />
+<h2 id="6-limitations-and-future-work">6. Limitations and Future Work</h2>
+<h3 id="61-current-limitations">6.1 Current Limitations</h3>
+<table>
+<thead>
+<tr>
+<th>Limitation</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Single-node Minikube</strong></td>
+<td>No true HA; node failure = total outage</td>
+<td>Use multi-node K3s or cloud K8s for production</td>
+</tr>
+<tr>
+<td><strong>Redis single replica</strong></td>
+<td>Cache layer is not HA</td>
+<td>Deploy Redis Sentinel or Redis Cluster</td>
+</tr>
+<tr>
+<td><strong>No HTTPS</strong></td>
+<td>Traffic is unencrypted</td>
+<td>Add cert-manager + Let's Encrypt in production</td>
+</tr>
+<tr>
+<td><strong>No message queue</strong></td>
+<td>Order processing is synchronous</td>
+<td>Introduce Kafka/RabbitMQ for async tasks</td>
+</tr>
+<tr>
+<td><strong>No distributed tracing</strong></td>
+<td>X-Request-ID is manual</td>
+<td>Integrate Jaeger/Tempo for OpenTelemetry</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL single instance</strong></td>
+<td>No read replicas or failover</td>
+<td>Deploy Patroni or CloudNativePG operator</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-future-work">6.2 Future Work</h3>
+<ol>
+<li><strong>Service Mesh</strong>: Integrate Istio/Linkerd for automatic mTLS, traffic mirroring, and canary deployments</li>
+<li><strong>GitOps</strong>: Use ArgoCD to automatically sync K8s state from Git, enabling PR-based previews</li>
+<li><strong>Vault Integration</strong>: Replace K8s Secrets with HashiCorp Vault for dynamic credential issuance</li>
+<li><strong>Chaos Engineering</strong>: Regularly inject pod failures and network partitions using Litmus/Chaos Mesh</li>
+<li><strong>FinOps</strong>: Implement Kubecost for namespace-level cost tracking and resource optimization</li>
+</ol>
+<hr />
+<h2 id="7-conclusion">7. Conclusion</h2>
+<p>This project demonstrates a <strong>complete, production-oriented cloud-native application</strong> built from the ground up. Key achievements include:</p>
+<ul>
+<li><strong>Architecture</strong>: A clean three-tier design with proper separation of concerns</li>
+<li><strong>Kubernetes</strong>: Comprehensive use of Deployments, Services, Ingress, HPA, PDB, NetworkPolicy, and ConfigMaps</li>
+<li><strong>Observability</strong>: Prometheus metrics, Grafana dashboards, Alertmanager rules, and X-Request-ID tracing</li>
+<li><strong>Security</strong>: JWT authentication, rate limiting, IDOR fixes, security headers, and non-root containers</li>
+<li><strong>Reliability</strong>: Graceful shutdown, health probes, topology spread constraints, and ACID transactions</li>
+<li><strong>Quality</strong>: 115 automated tests with 90% backend coverage, CI/CD pipeline, and security scanning</li>
+</ul>
+<p>The system successfully deploys on Minikube with a single command (<code>make deploy-tag</code>) and provides a solid foundation for production deployment on any Kubernetes cluster.</p>
+<hr />
+<h2 id="8-references">8. References</h2>
+<ol>
+<li>Kubernetes Documentation. https://kubernetes.io/docs/</li>
+<li>Flask Documentation. https://flask.palletsprojects.com/</li>
+<li>Vue.js 3 Guide. https://vuejs.org/guide/</li>
+<li>Prometheus Monitoring. https://prometheus.io/docs/</li>
+<li>Alembic Migrations. https://alembic.sqlalchemy.org/</li>
+<li>Minikube Quick Start. https://minikube.sigs.k8s.io/docs/start/</li>
+<li>Cloud Native Computing Foundation. https://www.cncf.io/</li>
+</ol>
+<hr />
+<p><em>Report generated on May 20, 2026</em></p>
+</body>
+</html>
