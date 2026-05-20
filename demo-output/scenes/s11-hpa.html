@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1920px;
+  height: 1080px;
+  background: #0d1117;
+  display: flex;
+  flex-direction: column;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  color: #c9d1d9;
+  overflow: hidden;
+  padding: 60px;
+}
+.header {
+  font-size: 36px;
+  font-weight: 700;
+  color: #58a6ff;
+  margin-bottom: 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.terminal-window {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 30px;
+  font-size: 18px;
+  line-height: 1.8;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.terminal-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #30363d;
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; }
+.red { background: #ff5f56; }
+.yellow { background: #ffbd2e; }
+.green { background: #27c93f; }
+.prompt { color: #7ee787; }
+.command { color: #fff; }
+.output { color: #8b949e; }
+.highlight { color: #f0883e; font-weight: bold; }
+.success { color: #3fb950; }
+.metric-box {
+  position: absolute;
+  bottom: 80px;
+  right: 80px;
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 30px;
+  width: 380px;
+}
+.metric-title {
+  font-size: 16px;
+  color: #8b949e;
+  margin-bottom: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.metric-value {
+  font-size: 48px;
+  font-weight: 700;
+  color: #3fb950;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.metric-label {
+  font-size: 14px;
+  color: #58a6ff;
+  margin-top: 5px;
+}
+</style>
+</head>
+<body>
+<div class="header">Horizontal Pod Autoscaler in Action</div>
+<div class="terminal-window">
+  <div class="terminal-header">
+    <div class="dot red"></div>
+    <div class="dot yellow"></div>
+    <div class="dot green"></div>
+    <span style="margin-left: 15px; color: #8b949e; font-size: 14px;">bash — kubectl</span>
+  </div>
+  <div><span class="prompt">$</span> <span class="command">kubectl get hpa -n bookstore</span></div>
+  <div class="output">
+    NAME              REFERENCE                TARGETS    MINPODS   MAXPODS   REPLICAS<br>
+    bookstore-backend Deployment/bookstore-backend <span class="highlight">85%/70%</span>   2         5         <span class="success">4</span>
+  </div>
+  <div style="margin-top: 20px;"><span class="prompt">$</span> <span class="command">watch kubectl get pods -n bookstore</span></div>
+  <div class="output">
+    NAME                               READY   STATUS<br>
+    bookstore-backend-7d9f4b8c5-abc12   1/1     Running<br>
+    bookstore-backend-7d9f4b8c5-def34   1/1     Running<br>
+    bookstore-backend-7d9f4b8c5-ghi56   1/1     Running<br>
+    <span class="success">bookstore-backend-7d9f4b8c5-jkl78   1/1     Running</span><br>
+    <span class="success">bookstore-backend-7d9f4b8c5-mno90   1/1     Running</span>
+  </div>
+</div>
+<div class="metric-box">
+  <div class="metric-title">Load Test Results</div>
+  <div class="metric-value">150 VUs</div>
+  <div class="metric-label">2 → 5 Replicas in 90s</div>
+</div>
+</body>
+</html>

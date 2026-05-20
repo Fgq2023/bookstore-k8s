@@ -1,0 +1,1 @@
+Our answer: a cloud-native online bookstore. Containerized, orchestrated by Kubernetes, with full observability, auto-scaling, and enterprise-grade security.

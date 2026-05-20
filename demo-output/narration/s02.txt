@@ -1,0 +1,1 @@
+Traditional web applications struggle with scaling, deployment complexity, and lack of observability. How do we build a modern, production-ready e-commerce system?

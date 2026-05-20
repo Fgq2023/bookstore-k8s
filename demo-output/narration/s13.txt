@@ -1,0 +1,1 @@
+Redis serves as our distributed cache. Book listings are cached for 60 seconds. On a cache hit, response time drops from milliseconds to microseconds. If Redis fails, the system gracefully falls back to in-memory caching.

@@ -1,0 +1,1 @@
+Under the hood, everything runs on Kubernetes. We have four core services: frontend, backend, PostgreSQL, and Redis, each isolated by NetworkPolicy for zero-trust security.

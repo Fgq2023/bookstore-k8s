@@ -1,0 +1,1 @@
+This is our cloud-native bookstore — built for scale, observed in real-time, secured by design, and validated by comprehensive testing. Thank you for watching.

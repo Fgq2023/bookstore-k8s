@@ -1,0 +1,1 @@
+Each book shows detailed information including ISBN and real-time stock. Adding to cart triggers an API call with session isolation. The cart count updates reactively across the entire application.

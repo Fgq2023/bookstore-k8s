@@ -1,0 +1,1 @@
+Every pull request triggers an eight-stage CI pipeline: linting, unit tests, integration tests, frontend E2E with Playwright, Docker builds, Trivy security scans, and Kubernetes manifest validation.

@@ -1,0 +1,1 @@
+When traffic spikes, the Horizontal Pod Autoscaler scales the backend from two to five replicas based on CPU utilization. We verified this with k6 load testing at 150 virtual users.

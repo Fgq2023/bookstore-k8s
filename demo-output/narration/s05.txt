@@ -1,0 +1,1 @@
+The search feature queries by title or author instantly, with backend API pagination and Redis caching for sub-millisecond response times.

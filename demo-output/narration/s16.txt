@@ -1,0 +1,1 @@
+Our testing strategy follows the pyramid: 75 fast unit tests, 6 integration tests with real PostgreSQL via testcontainers, and 3 Playwright browser tests covering the complete user journey.

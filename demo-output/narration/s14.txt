@@ -1,0 +1,1 @@
+Security is layered: JWT authentication, Redis-backed rate limiting, zero-trust NetworkPolicies, and non-root containers with dropped capabilities.

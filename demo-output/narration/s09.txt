@@ -1,0 +1,1 @@
+Our payment mock simulates a gateway, transitioning orders from confirmed to shipped. Stock is atomically deducted, and the cache is invalidated so all users see updated inventory immediately.

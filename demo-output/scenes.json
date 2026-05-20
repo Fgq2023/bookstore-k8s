@@ -1,0 +1,157 @@
+{
+  "title": "Cloud-Native Bookstore Demo Video",
+  "resolution": "1920x1080",
+  "fps": 30,
+  "total_duration": "3m 30s",
+  "scenes": [
+    {
+      "id": "s01",
+      "file": "scenes/s01-title.html",
+      "duration": 5,
+      "narration": "",
+      "audio_file": "narration/s01.txt",
+      "transition": "fade"
+    },
+    {
+      "id": "s02",
+      "file": "scenes/s02-problem.html",
+      "duration": 7,
+      "narration": "Traditional web applications struggle with scaling, deployment complexity, and lack of observability. How do we build a modern, production-ready e-commerce system?",
+      "audio_file": "narration/s02.txt",
+      "transition": "cut"
+    },
+    {
+      "id": "s03",
+      "file": "scenes/s03-solution.html",
+      "duration": 8,
+      "narration": "Our answer: a cloud-native online bookstore. Containerized, orchestrated by Kubernetes, with full observability, auto-scaling, and enterprise-grade security.",
+      "audio_file": "narration/s03.txt",
+      "transition": "fade"
+    },
+    {
+      "id": "s04",
+      "file": "screen-recording://browser-homepage",
+      "duration": 15,
+      "narration": "Welcome to our bookstore. Users can browse the complete catalog with real-time stock information. The frontend is a Vue 3 single-page application, served by nginx.",
+      "audio_file": "narration/s04.txt",
+      "transition": "smooth-scroll",
+      "overlay_text": "Vue 3 + Vite + Tailwind CSS"
+    },
+    {
+      "id": "s05",
+      "file": "screen-recording://browser-search",
+      "duration": 12,
+      "narration": "The search feature queries by title or author instantly, with backend API pagination and Redis caching for sub-millisecond response times.",
+      "audio_file": "narration/s05.txt",
+      "transition": "cut",
+      "overlay_text": "Redis Cache + PostgreSQL Indexes"
+    },
+    {
+      "id": "s06",
+      "file": "screen-recording://browser-add-cart",
+      "duration": 15,
+      "narration": "Each book shows detailed information including ISBN and real-time stock. Adding to cart triggers an API call with session isolation. The cart count updates reactively across the entire application.",
+      "audio_file": "narration/s06.txt",
+      "transition": "cut",
+      "overlay_text": "Session Isolation + Reactive State"
+    },
+    {
+      "id": "s07",
+      "file": "screen-recording://browser-cart",
+      "duration": 15,
+      "narration": "The shopping cart supports quantity updates and item removal with instant total calculation. Every cart operation is protected against IDOR attacks — users can only modify their own cart items.",
+      "audio_file": "narration/s07.txt",
+      "transition": "cut",
+      "overlay_text": "IDOR Protection via JOIN Verification"
+    },
+    {
+      "id": "s08",
+      "file": "screen-recording://browser-order",
+      "duration": 18,
+      "narration": "Order placement is wrapped in an ACID database transaction: create order, deduct stock, clear cart, and invalidate the Redis cache — all succeed or all rollback. The order state machine tracks every transition in a JSONB audit trail.",
+      "audio_file": "narration/s08.txt",
+      "transition": "cut",
+      "overlay_text": "ACID Transaction + State Machine"
+    },
+    {
+      "id": "s09",
+      "file": "screen-recording://browser-payment",
+      "duration": 15,
+      "narration": "Our payment mock simulates a gateway, transitioning orders from confirmed to shipped. Stock is atomically deducted, and the cache is invalidated so all users see updated inventory immediately.",
+      "audio_file": "narration/s09.txt",
+      "transition": "fade",
+      "overlay_text": "Write-Through Cache Invalidation"
+    },
+    {
+      "id": "s10",
+      "file": "screen-recording://terminal-kubectl",
+      "duration": 12,
+      "narration": "Under the hood, everything runs on Kubernetes. We have four core services: frontend, backend, PostgreSQL, and Redis, each isolated by NetworkPolicy for zero-trust security.",
+      "audio_file": "narration/s10.txt",
+      "transition": "cut",
+      "overlay_text": "Kustomize + NetworkPolicy"
+    },
+    {
+      "id": "s11",
+      "file": "scenes/s11-hpa.html",
+      "duration": 15,
+      "narration": "When traffic spikes, the Horizontal Pod Autoscaler scales the backend from two to five replicas based on CPU utilization. We verified this with k6 load testing at 150 virtual users.",
+      "audio_file": "narration/s11.txt",
+      "transition": "cut",
+      "overlay_text": "HPA: 2→5 Replicas | CPU Target: 70%"
+    },
+    {
+      "id": "s12",
+      "file": "scenes/s12-monitoring.html",
+      "duration": 20,
+      "narration": "Observability is built-in. Prometheus scrapes metrics every 15 seconds. Grafana dashboards show real-time performance, including database connection pool utilization. Alertmanager watches for five critical conditions — from high latency to pool exhaustion.",
+      "audio_file": "narration/s12.txt",
+      "transition": "cut",
+      "overlay_text": "Prometheus + Grafana + Alertmanager"
+    },
+    {
+      "id": "s13",
+      "file": "screen-recording://terminal-redis",
+      "duration": 12,
+      "narration": "Redis serves as our distributed cache. Book listings are cached for 60 seconds. On a cache hit, response time drops from milliseconds to microseconds. If Redis fails, the system gracefully falls back to in-memory caching.",
+      "audio_file": "narration/s13.txt",
+      "transition": "cut",
+      "overlay_text": "Redis Primary → Memory Fallback"
+    },
+    {
+      "id": "s14",
+      "file": "screen-recording://terminal-security",
+      "duration": 10,
+      "narration": "Security is layered: JWT authentication, Redis-backed rate limiting, zero-trust NetworkPolicies, and non-root containers with dropped capabilities.",
+      "audio_file": "narration/s14.txt",
+      "transition": "fade",
+      "overlay_text": "Defense in Depth"
+    },
+    {
+      "id": "s15",
+      "file": "screen-recording://github-actions",
+      "duration": 15,
+      "narration": "Every pull request triggers an eight-stage CI pipeline: linting, unit tests, integration tests, frontend E2E with Playwright, Docker builds, Trivy security scans, and Kubernetes manifest validation.",
+      "audio_file": "narration/s15.txt",
+      "transition": "cut",
+      "overlay_text": "GitHub Actions | 115 Tests | 90% Coverage"
+    },
+    {
+      "id": "s16",
+      "file": "screen-recording://terminal-tests",
+      "duration": 15,
+      "narration": "Our testing strategy follows the pyramid: 75 fast unit tests, 6 integration tests with real PostgreSQL via testcontainers, and 3 Playwright browser tests covering the complete user journey.",
+      "audio_file": "narration/s16.txt",
+      "transition": "cut",
+      "overlay_text": "115 Tests | 90% Backend Coverage"
+    },
+    {
+      "id": "s17",
+      "file": "scenes/s17-closing.html",
+      "duration": 20,
+      "narration": "This is our cloud-native bookstore — built for scale, observed in real-time, secured by design, and validated by comprehensive testing. Thank you for watching.",
+      "audio_file": "narration/s17.txt",
+      "transition": "fade"
+    }
+  ]
+}

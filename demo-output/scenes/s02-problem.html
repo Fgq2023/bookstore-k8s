@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1920px;
+  height: 1080px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: white;
+  overflow: hidden;
+}
+.left-panel {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 60px;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
+.right-panel {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 80px;
+}
+.section-title {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 50px;
+  text-align: center;
+}
+.problem-icon {
+  font-size: 120px;
+  margin-bottom: 30px;
+  opacity: 0.8;
+}
+.problem-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+  font-size: 28px;
+  color: #e0e0e0;
+  animation: slideIn 0.5s ease forwards;
+  opacity: 0;
+}
+.problem-item:nth-child(1) { animation-delay: 0.2s; }
+.problem-item:nth-child(2) { animation-delay: 0.4s; }
+.problem-item:nth-child(3) { animation-delay: 0.6s; }
+.problem-item:nth-child(4) { animation-delay: 0.8s; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.icon {
+  font-size: 36px;
+  margin-right: 20px;
+}
+.red-accent {
+  color: #e74c3c;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="left-panel">
+  <div class="problem-icon">⚠️</div>
+  <div class="section-title" style="color: #e74c3c;">The Challenge</div>
+  <div style="text-align: center; color: #95a5a6; font-size: 22px; line-height: 1.6; max-width: 500px;">
+    Traditional e-commerce systems face critical scalability and operational issues
+  </div>
+</div>
+<div class="right-panel">
+  <div class="problem-item">
+    <span class="icon">❌</span>
+    <span><span class="red-accent">Scaling Bottlenecks</span> — Cannot handle traffic spikes</span>
+  </div>
+  <div class="problem-item">
+    <span class="icon">❌</span>
+    <span><span class="red-accent">Manual Deployments</span> — Error-prone, time-consuming</span>
+  </div>
+  <div class="problem-item">
+    <span class="icon">❌</span>
+    <span><span class="red-accent">No Observability</span> — Blind to system health</span>
+  </div>
+  <div class="problem-item">
+    <span class="icon">❌</span>
+    <span><span class="red-accent">Security Gaps</span> — Vulnerable to attacks</span>
+  </div>
+</div>
+</body>
+</html>

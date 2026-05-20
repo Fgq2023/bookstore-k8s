@@ -1,0 +1,1 @@
+Observability is built-in. Prometheus scrapes metrics every 15 seconds. Grafana dashboards show real-time performance, including database connection pool utilization. Alertmanager watches for five critical conditions — from high latency to pool exhaustion.
