@@ -2,15 +2,17 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { store } from '../store'
-import { isLoggedIn, clearToken } from '../api/client'
+import { isLoggedIn, clearToken, isAdmin } from '../api/client'
 
 const route = useRoute()
 const router = useRouter()
 const current = computed(() => route.name)
 const loggedIn = ref(isLoggedIn())
+const isAdminUser = ref(isAdmin())
 
 function updateAuth() {
   loggedIn.value = isLoggedIn()
+  isAdminUser.value = isAdmin()
 }
 
 function logout() {
@@ -62,6 +64,14 @@ onUnmounted(() => {
         </router-link>
 
         <div v-if="loggedIn" class="flex items-center gap-1 ml-2 pl-2 border-l border-slate-200">
+          <router-link
+            v-if="isAdminUser"
+            to="/admin"
+            class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            :class="current === 'admin' ? 'bg-purple-50 text-purple-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'"
+          >
+            ⚙️ Admin
+          </router-link>
           <router-link
             to="/profile"
             class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"

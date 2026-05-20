@@ -22,11 +22,15 @@ const router = createRouter({
   routes,
 })
 
+import { isAdmin } from '../api/client'
+
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('bookstore_token')
   if (to.meta.requiresAuth && !token) {
     next('/login')
   } else if (to.meta.guestOnly && token) {
+    next('/')
+  } else if (to.meta.requiresAdmin && !isAdmin()) {
     next('/')
   } else {
     next()
