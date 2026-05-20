@@ -66,7 +66,7 @@ test.beforeEach(async ({ page }) => {
     }
   })
 
-  await page.route('**/api/auth/login', async (route) => {
+  await page.route('**/api/auth/login**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -74,7 +74,7 @@ test.beforeEach(async ({ page }) => {
     })
   })
 
-  await page.route('**/api/auth/me', async (route) => {
+  await page.route('**/api/auth/me**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -135,7 +135,7 @@ test.beforeEach(async ({ page }) => {
     }
   })
 
-  await page.route('**/api/payments', async (route) => {
+  await page.route('**/api/payments**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -196,7 +196,7 @@ test('full shopping flow: browse -> add to cart -> place order -> pay', async ({
   await page.getByRole('link', { name: 'Cart' }).click()
   await expect(page).toHaveURL('/cart')
   await expect(page.getByText('Clean Code')).toBeVisible()
-  await expect(page.getByText('$85.98')).toBeVisible()
+  await expect(page.getByText('Total: $85.98')).toBeVisible()
 
   // 4. Place order
   await page.getByRole('button', { name: 'Place Order' }).click()
