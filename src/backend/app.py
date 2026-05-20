@@ -18,9 +18,9 @@ _log_handler = logging.StreamHandler(sys.stdout)
 if APP_ENV == 'production':
     try:
         from pythonjsonlogger import jsonlogger
+        # Use standard fields without rename to avoid KeyError in python-json-logger 2.0.7
         _log_handler.setFormatter(jsonlogger.JsonFormatter(
-            '%(timestamp)s %(level)s %(name)s %(message)s %(pathname)s %(lineno)d',
-            rename_fields={'levelname': 'level', 'asctime': 'timestamp'}
+            '%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d'
         ))
     except ImportError:
         _log_handler.setFormatter(logging.Formatter(

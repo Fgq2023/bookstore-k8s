@@ -113,8 +113,8 @@ verify: ## 端到端验证（Pod 状态 + API 健康检查）
 	@echo "✅ Verification complete"
 
 # ================= 清理 =================
-clean: ## 清理部署资源
-	kubectl delete -k $(OVERLAY_DIR)
+clean: ## 清理部署资源（忽略不存在的资源）
+	kubectl delete -k $(OVERLAY_DIR) --ignore-not-found=true
 
 # ================= 监控访问 =================
 port-forward-prometheus: ## 端口转发 Prometheus UI (localhost:9090)

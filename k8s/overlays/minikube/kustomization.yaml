@@ -19,6 +19,6 @@ patches:
 
 images:
   - name: bookstore-backend
-    newTag: v3.0.3
+    newTag: demo
   - name: bookstore-frontend
-    newTag: v3.0.3
+    newTag: demo
