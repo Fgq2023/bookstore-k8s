@@ -33,7 +33,7 @@ The implemented system supports the following core features:
 | **Order Placement** | ACID transaction: order creation, stock deduction, cart cleanup |
 | **Payment Mock** | Simulated payment gateway with order state transitions |
 | **User Authentication** | JWT-based registration and login with role-based access |
-| **Admin Dashboard** | Protected metrics view for administrative users |
+| **Admin Dashboard** | Protected book CRUD management + metrics view for admin users |
 | **Auto-scaling** | HPA scales backend (2→5) and frontend (1→3) by CPU utilization |
 | **Monitoring & Alerting** | Prometheus metrics, Grafana dashboards, Alertmanager rules |
 
@@ -136,7 +136,7 @@ src/backend/
 │   ├── orders.py       # Order creation with ACID transactions
 │   ├── auth.py         # JWT registration/login
 │   ├── payments.py     # Payment state machine
-│   ├── admin.py        # Admin-only endpoints
+│   ├── admin.py        # Admin-only endpoints: book CRUD + order status + metrics
 │   └── probes.py       # Health checks and Prometheus metrics (now with DB pool metrics)
 ├── utils/
 │   ├── db.py           # Connection pool + transaction context manager + pool metrics
@@ -160,6 +160,12 @@ src/backend/
 
 5. **Pydantic Error Beautification**: The `format_validation_errors()` helper converts raw Pydantic jargon (`Input should be a valid string`) into user-friendly messages (`must be a valid string`), preventing internal field names from leaking to clients.
 
+6. **Admin Book Management**: The `admin.py` blueprint provides full CRUD operations for books (`GET/POST/PUT/DELETE /api/admin/books`) protected by JWT RBAC. Key implementation details:
+   - Dynamic SQL for partial updates: only modified fields are sent to the database
+   - Cache invalidation: `cache_clear_prefix("books_list:")` is called on create/update/delete to ensure catalog consistency
+   - UUID generation: auto-generates unique string IDs (8-character hex) since the `books` table uses `VARCHAR` primary keys
+   - Consistent permission checks: `_check_admin()` helper centralizes the `is_admin` verification
+
 ### 3.2 Frontend Architecture
 
 The frontend is a **Vue 3 Single-Page Application** built with Vite and served by nginx:
@@ -176,12 +182,13 @@ src/frontend/src/
     ├── CartView.vue     # Shopping cart management
     ├── OrdersView.vue   # Order history
     ├── LoginView.vue    # Authentication
-    └── AdminView.vue    # Metrics display
+    └── AdminView.vue    # Admin dashboard: book CRUD table + metrics display
 ```
 
 **Key Features:**
 - **JWT Interceptor**: Automatically injects `Authorization: Bearer` header and handles 401 globally
-- **Route Guards**: `/profile` and `/admin` require authentication; `/login` redirects authenticated users
+- **Route Guards**: `/profile` requires authentication; `/admin` requires both auth and `is_admin=true`; `/login` redirects authenticated users
+- **Admin UI**: Navbar conditionally renders **⚙️ Admin** link (purple highlight) based on JWT `is_admin` claim; AdminView provides dual-tab interface (Book Management + Metrics)
 - **Session Management**: `session_id` persisted in `localStorage` for cart isolation
 
 **Build Configuration:**
@@ -221,6 +228,8 @@ The PostgreSQL schema evolved through 4 Alembic migrations:
 | **Security Headers** | `X-Content-Type-Options`, `X-Frame-Options`, `HSTS`, `Referrer-Policy` |
 | **Container Security** | Non-root user (`runAsUser: 1000`), dropped capabilities, `allowPrivilegeEscalation: false` |
 | **Network Isolation** | `NetworkPolicy` restricts traffic: ingress→frontend→backend→db/redis only |
+| **Admin RBAC** | JWT `is_admin` claim checked on every admin endpoint; frontend `isAdmin()` helper conditionally renders admin UI; Vue Router `requiresAdmin` meta flag blocks non-admin access |
+| **Input Validation** | Pydantic v2 strict mode; user-friendly error messages without internal field leakage |
 | **Vulnerability Scanning** | Trivy scans on every CI build; results uploaded to GitHub Security tab |
 | **Input Validation** | Pydantic v2 strict mode; user-friendly error messages without internal field leakage |
 
@@ -365,8 +374,9 @@ This project demonstrates a **complete, production-oriented cloud-native applica
 - **Kubernetes**: Comprehensive use of Deployments, Services, Ingress, HPA, PDB, NetworkPolicy, ConfigMaps, and topology spread constraints
 - **Caching**: Redis distributed cache with graceful memory fallback, ensuring multi-replica consistency
 - **Observability**: Prometheus metrics (including real-time DB pool monitoring), Grafana dashboards, Alertmanager rules, and X-Request-ID tracing
-- **Security**: JWT authentication, rate limiting, IDOR fixes, security headers, non-root containers, and vulnerability scanning
+- **Security**: JWT authentication with role-based access control (RBAC), rate limiting, IDOR fixes, security headers, non-root containers, and vulnerability scanning
 - **Reliability**: Graceful shutdown, three-tier health probes, ACID transactions, and initContainer migrations
+- **Admin Features**: Full book CRUD management with cache invalidation, protected by JWT RBAC with frontend conditional rendering
 - **Quality**: 115 automated tests with 90% backend coverage, multi-layer testing pyramid, and 8-stage CI/CD pipeline
 
 The system successfully deploys on Minikube with a single command (`make deploy-tag`) and provides a solid foundation for production deployment on any Kubernetes cluster.

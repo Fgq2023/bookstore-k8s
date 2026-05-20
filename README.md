@@ -58,6 +58,7 @@ graph LR
 | **Observability** | Prometheus, Grafana, **Alertmanager**, structured JSON logging, **X-Request-ID** distributed tracing |
 | **API Design** | Pydantic v2 validation with user-friendly error messages (no internal jargon leaked) |
 | **DB Monitoring** | Real-time connection pool metrics (used/free/utilization) exposed on `/metrics` |
+| **Admin Panel** | Book CRUD management (create, edit, delete) with JWT role-based access control |
 
 ## 🚀 Quick Start
 
@@ -180,7 +181,7 @@ make test     # Wait for rollout and print frontend URL
 │               ├── LoginView.vue    # Sign in
 │               ├── RegisterView.vue # Sign up
 │               ├── ProfileView.vue  # User profile + orders
-│               ├── AdminView.vue    # Admin metrics dashboard
+│               ├── AdminView.vue    # Admin dashboard: book CRUD + metrics
 │               ├── Toast.vue        # Notifications
 │               ├── __tests__/       # Vue component + API tests
 │               │   ├── BookCard.spec.js
@@ -209,7 +210,8 @@ make test     # Wait for rollout and print frontend URL
 ├── scripts/
 │   ├── loadtest.js              # Full shopping flow (k6)
 │   ├── loadtest-hpa.js          # HPA trigger test (k6)
-│   └── loadtest-v3.js           # Phase 3: pagination + auth + payment (k6)
+│   ├── loadtest-v3.js           # Phase 3: pagination + auth + payment (k6)
+│   └── create_admin.py          # Helper: create admin user in database
 ├── .github/workflows/ci.yml     # GitHub Actions pipeline
 ├── Makefile                     # Build / load / deploy commands
 └── README.md                    # This file
@@ -277,7 +279,15 @@ We use `except ValidationError as e` (not broad `except Exception`) to avoid acc
 
 | Method | Endpoint | Headers | Body | Description |
 |--------|----------|---------|------|-------------|
+| `GET` | `/api/admin/books` | `Authorization: Bearer <admin_token>` | — | List all books with full details (admin only) |
+| `POST` | `/api/admin/books` | `Authorization: Bearer <admin_token>` | `{title, author, isbn, price, stock_quantity}` | Add new book (admin only) |
+| `PUT` | `/api/admin/books/<id>` | `Authorization: Bearer <admin_token>` | `{title?, author?, isbn?, price?, stock_quantity?}` | Update book (admin only, partial updates) |
+| `DELETE` | `/api/admin/books/<id>` | `Authorization: Bearer <admin_token>` | — | Delete book (admin only) |
 | `PUT` | `/api/admin/orders/<id>/status` | `Authorization: Bearer <admin_token>` | `{status}` | Update order status (admin only) |
+
+**Admin Frontend:** Access `/admin` route after logging in with an admin account. The navbar shows an **⚙️ Admin** link (purple highlight) only for users with `is_admin=true` in their JWT token. The admin panel includes:
+- **Book Management** tab: Full CRUD table with add/edit/delete operations, stock quantity color coding
+- **Metrics** tab: Raw Prometheus metrics display |
 
 ### Health & Metrics
 
@@ -475,6 +485,21 @@ Unauthorized attempts now return `404 "item not found or access denied"`.
 - Token injected via `Authorization: Bearer` header
 - Axios interceptors handle 401 globally (redirect to login)
 
+### Admin RBAC
+
+Admin endpoints require `is_admin=true` in the JWT payload:
+
+- **Backend**: `@jwt_required` decorator + `_check_admin()` helper verify the `is_admin` claim
+- **Frontend**: `isAdmin()` helper decodes JWT payload to conditionally render the **⚙️ Admin** navbar link
+- **Vue Router**: `requiresAdmin` meta flag redirects non-admin users to homepage
+- **Admin endpoints**: `GET/POST/PUT/DELETE /api/admin/books`, `PUT /api/admin/orders/<id>/status`
+
+```bash
+# Create admin user
+kubectl cp scripts/create_admin.py -n bookstore <backend-pod>:/tmp/
+kubectl exec -n bookstore <backend-pod> -- python3 /tmp/create_admin.py
+```
+
 ### Rate Limiting
 
 | Endpoint | Limit |
@@ -521,7 +546,7 @@ make test-frontend-e2e         # Frontend Playwright browser E2E tests
 | `test_orders.py` | 7 | Create, list, pagination, empty cart |
 | `test_auth.py` | 9 | Register, login, JWT, 401/403 |
 | `test_payments.py` | 3 | Validation, state transition, 503 |
-| `test_admin.py` | 4 | Auth, forbidden, invalid status |
+| `test_admin.py` | 4 | Auth, forbidden, invalid status, book CRUD |
 | `test_probes.py` | 4 | startup/healthz/ready/metrics |
 | `test_encoder.py` | 2 | DecimalEncoder, json_response |
 | `test_errors.py` | 3 | 404, CORS, security headers |
